@@ -1,64 +1,88 @@
 
 
-# PrintPreflight — Customer Dashboard
+# Rebuild Submit Job Page for JSON API
 
-A clean, professional SaaS dashboard for the PrintPreflight PDF preflight API service. Design inspired by the reference screenshot — light theme, card-based KPIs, subtle colors, and data-rich charts.
+The current Submit Job page uses file upload (multipart/form-data), but your API actually expects a **JSON payload** with an artwork URL, webhook config, proof options, and detailed print specifications. This requires a complete rewrite of the submission form.
 
----
+## What Changes
 
-## 1. Landing Page
-- Hero section explaining PrintPreflight's value prop (automated PDF preflight checks via API)
-- Feature highlights (speed, accuracy, API-first)
-- **Pricing section** with three plan cards:
-  - **Free** — 50 jobs/month, 1 API key
-  - **Pro** — 500 jobs/month, 5 API keys
-  - **Enterprise** — Unlimited jobs, unlimited keys, priority support
-- Call-to-action buttons leading to sign up
+### 1. Replace file upload with a structured form
 
-## 2. Authentication (Supabase)
-- Sign up & login pages with email/password
-- Extended user profiles table (company name, billing address)
-- Password reset flow with dedicated reset page
-- Protected routes for all dashboard pages
+The new form will have these sections:
 
-## 3. Dashboard Home
-- Top KPI cards showing: jobs this month, plan limit, pass rate, average processing time
-- Usage progress bar (jobs used vs. plan limit)
-- Recent jobs list (last 10)
-- Line chart showing daily job volume over the current month
+**Artwork** - URL to the file and filename
+- Artwork URL (required)
+- Filename (required)
 
-## 4. API Keys Page
-- List of active API keys (name, created date, last used, masked key value)
-- "Create New Key" button — generates key, shows it once in a modal
-- Revoke key action with confirmation dialog
-- Key count limit based on plan tier
+**Webhook** (optional, collapsible)
+- Webhook URL
+- Webhook secret
 
-## 5. Job History Page
-- Searchable, filterable table of all preflight jobs
-- Columns: Job ID, filename, submitted date, status (processing/complete/failed), result (pass/fail), duration
-- Filters by status and date range
-- Pagination
-- Click a row to open job detail
+**Proof Settings** (optional, collapsible)
+- Generate proof (toggle, default off)
+- Expiry hours (number, default 24)
 
-## 6. Job Detail Page
-- Job metadata (filename, submitted by, date, processing time)
-- Overall pass/fail status with badge
-- Preflight check breakdown — list of individual checks (fonts, color space, resolution, bleed, etc.) each with pass/fail and details
-- Option to download the original report/PDF
+**Specifications**
+- Units selector (mm / in)
+- Min DPI (number, default 300)
+- Colour space (any / CMYK / RGB)
+- Font check (toggle, default off)
+- Dimension tolerance (number, default 0.5)
 
-## 7. Billing Page
-- Current plan display with usage summary
-- Plan comparison cards for upgrading (integrated with Stripe)
-- Upgrade/downgrade actions via Stripe Checkout
-- Billing history / invoices list
+**Page Count**
+- Min pages, max pages
+- Must be even (toggle)
 
-## 8. Sidebar Navigation
-- Collapsible sidebar matching the reference screenshot style
-- Links: Dashboard, API Keys, Job History, Billing, Documentation (external link)
-- User avatar and account dropdown in the sidebar
+**Pages** (dynamic list -- add/remove pages)
+Each page entry:
+- Type: combined / front / back
+- Range: text input (e.g. "all", "1-4")
+- Trim width & height
+- Bleed: left, right, top, bottom
+- Safe zone: left, right, top, bottom
 
-## Technical Approach
-- **Backend**: Supabase for auth + profiles + plan tracking; Stripe for payments; Railway API (`preflight-api-production.up.railway.app`) for job data and API key management
-- **Frontend**: React + TypeScript + Tailwind + shadcn/ui + Recharts for charts
-- All API calls to the Railway backend will pass the Supabase JWT token in the Authorization header
+### 2. Update the API layer
+
+- Change `useSubmitJob` from file upload (`apiUpload`) to a JSON POST (`apiPost`)
+- Define a `SubmitJobPayload` TypeScript interface matching the expected schema
+- Remove the unused `apiUpload` function (or keep if needed elsewhere)
+
+### 3. Form validation with Zod
+
+- Validate artwork URL is a valid URL
+- Validate numeric fields (DPI, dimensions, tolerances) are positive numbers
+- At least one page spec is required
+- Use `react-hook-form` + `@hookform/resolvers` (already installed) for form state management
+
+## Technical Details
+
+### Files to modify:
+- **`src/pages/SubmitJob.tsx`** -- complete rewrite: remove drag-drop, build multi-section form with collapsible sections using Accordion/Collapsible components
+- **`src/hooks/useApiData.ts`** -- change `useSubmitJob` mutation to accept `SubmitJobPayload` and use `apiPost` instead of `apiUpload`
+- **`src/lib/api.ts`** -- no changes needed (`apiPost` already exists)
+
+### New types (in useApiData.ts):
+```text
+SubmitJobPayload {
+  job_id?: string
+  artwork: { url: string, filename: string }
+  webhook?: { url: string, secret: string }
+  proof?: { generate: boolean, expires_hours: number }
+  spec: {
+    units: "mm" | "in"
+    pages: Array<PageSpec>
+    page_count: { min: number, max: number, must_be_even: boolean }
+    min_dpi: number
+    colour_space: "any" | "CMYK" | "RGB"
+    font_check: boolean
+    dimension_tolerance_mm: number
+  }
+}
+```
+
+### UI approach:
+- Use existing shadcn components: Input, Switch, Select, Button, Card, Accordion
+- Sensible defaults pre-filled (300 DPI, mm units, one "combined/all" page, etc.) so the form is quick to submit for simple jobs
+- Dynamic "Pages" section with add/remove buttons
+- Collapsible optional sections (webhook, proof) to keep the form clean
 

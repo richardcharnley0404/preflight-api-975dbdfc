@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,9 +126,9 @@ export default function ApiKeys() {
                 {keys?.map((k) => (
                   <TableRow key={k.id}>
                     <TableCell className="font-medium">{k.name}</TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">{k.key}</TableCell>
-                    <TableCell className="text-muted-foreground">{k.created}</TableCell>
-                    <TableCell className="text-muted-foreground">{k.last_used}</TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">{k.prefix}••••</TableCell>
+                    <TableCell className="text-muted-foreground">{format(new Date(k.created_at), "MMM d, yyyy")}</TableCell>
+                    <TableCell className="text-muted-foreground">{k.last_used_at ? format(new Date(k.last_used_at), "MMM d, yyyy") : "Never"}</TableCell>
                     <TableCell>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

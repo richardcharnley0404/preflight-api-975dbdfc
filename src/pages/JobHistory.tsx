@@ -2,20 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search } from "lucide-react";
-
-const mockJobs = Array.from({ length: 25 }, (_, i) => ({
-  id: `job_${String(i + 1).padStart(3, "0")}`,
-  filename: ["brochure_v3.pdf", "poster_final.pdf", "flyer_cmyk.pdf", "catalog_spread.pdf", "label_die.pdf"][i % 5],
-  submitted: `2026-0${3 - Math.floor(i / 10)}-${String(28 - (i % 28)).padStart(2, "0")}`,
-  status: i === 3 ? "processing" : i === 7 ? "failed" : "complete",
-  result: i === 3 ? "-" : i % 4 === 0 ? "fail" : "pass",
-  duration: i === 3 ? "-" : `${(Math.random() * 4 + 0.5).toFixed(1)}s`,
-}));
+import { useJobHistory } from "@/hooks/useApiData";
 
 function StatusBadge({ status, result }: { status: string; result: string }) {
   if (status === "processing") return <Badge variant="secondary">Processing</Badge>;
@@ -31,14 +24,16 @@ export default function JobHistory() {
   const navigate = useNavigate();
   const perPage = 10;
 
-  const filtered = mockJobs.filter((job) => {
-    const matchesSearch = job.filename.toLowerCase().includes(search.toLowerCase()) || job.id.includes(search);
-    const matchesStatus = statusFilter === "all" || job.status === statusFilter || job.result === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data, isLoading } = useJobHistory({
+    search: search || undefined,
+    status: statusFilter,
+    page,
+    per_page: perPage,
   });
 
-  const paged = filtered.slice(page * perPage, (page + 1) * perPage);
-  const totalPages = Math.ceil(filtered.length / perPage);
+  const jobs = data?.jobs ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / perPage);
 
   return (
     <div className="space-y-6">
@@ -75,43 +70,60 @@ export default function JobHistory() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job ID</TableHead>
-                <TableHead>Filename</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Duration</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paged.map((job) => (
-                <TableRow
-                  key={job.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/dashboard/jobs/${job.id}`)}
-                >
-                  <TableCell className="font-mono text-sm">{job.id}</TableCell>
-                  <TableCell className="font-medium">{job.filename}</TableCell>
-                  <TableCell className="text-muted-foreground">{job.submitted}</TableCell>
-                  <TableCell><StatusBadge status={job.status} result={job.result} /></TableCell>
-                  <TableCell className="text-muted-foreground">{job.duration}</TableCell>
-                </TableRow>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
               ))}
-            </TableBody>
-          </Table>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
-              <p className="text-sm text-muted-foreground">
-                Showing {page * perPage + 1}-{Math.min((page + 1) * perPage, filtered.length)} of {filtered.length}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button>
-                <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>Next</Button>
-              </div>
             </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job ID</TableHead>
+                    <TableHead>Filename</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow
+                      key={job.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/dashboard/jobs/${job.id}`)}
+                    >
+                      <TableCell className="font-mono text-sm">{job.id}</TableCell>
+                      <TableCell className="font-medium">{job.filename}</TableCell>
+                      <TableCell className="text-muted-foreground">{job.submitted}</TableCell>
+                      <TableCell><StatusBadge status={job.status} result={job.result} /></TableCell>
+                      <TableCell className="text-muted-foreground">{job.duration}</TableCell>
+                    </TableRow>
+                  ))}
+                  {jobs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No jobs found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {page * perPage + 1}-{Math.min((page + 1) * perPage, total)} of {total}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button>
+                    <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>Next</Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

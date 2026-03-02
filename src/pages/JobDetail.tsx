@@ -2,28 +2,9 @@ import { useParams, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Download, CheckCircle, XCircle } from "lucide-react";
-
-// Mock data for a single job
-const mockJob = {
-  id: "job_001",
-  filename: "brochure_v3.pdf",
-  submittedBy: "user@company.com",
-  submitted: "2026-03-01 14:32:00",
-  processingTime: "2.4s",
-  status: "complete",
-  result: "fail",
-  checks: [
-    { name: "Font Embedding", status: "pass", details: "All fonts are embedded." },
-    { name: "Color Space", status: "fail", details: "Page 3 contains RGB elements. Convert to CMYK." },
-    { name: "Image Resolution", status: "pass", details: "All images ≥ 300 DPI." },
-    { name: "Bleed Area", status: "pass", details: "3mm bleed detected on all sides." },
-    { name: "Trim Marks", status: "pass", details: "Trim marks present." },
-    { name: "Transparency", status: "pass", details: "No live transparency detected." },
-    { name: "Overprint", status: "warning", details: "Overprint detected on page 2. Review recommended." },
-    { name: "PDF/X Compliance", status: "fail", details: "File is not PDF/X-1a compliant. Missing output intent." },
-  ],
-};
+import { useJobDetail } from "@/hooks/useApiData";
 
 function CheckIcon({ status }: { status: string }) {
   if (status === "pass") return <CheckCircle className="h-5 w-5 text-success" />;
@@ -33,7 +14,32 @@ function CheckIcon({ status }: { status: string }) {
 
 export default function JobDetail() {
   const { jobId } = useParams();
-  const job = mockJob; // In real app, fetch by jobId
+  const { data: job, isLoading } = useJobDetail(jobId);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  if (!job) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Job not found</p>
+        <Button variant="outline" asChild className="mt-4">
+          <Link to="/dashboard/jobs">Back to Jobs</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -55,9 +61,9 @@ export default function JobDetail() {
       {/* Metadata */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Submitted By", value: job.submittedBy },
+          { label: "Submitted By", value: job.submitted_by },
           { label: "Submitted", value: job.submitted },
-          { label: "Processing Time", value: job.processingTime },
+          { label: "Processing Time", value: job.processing_time },
           { label: "Status", value: job.status },
         ].map((item) => (
           <Card key={item.label}>

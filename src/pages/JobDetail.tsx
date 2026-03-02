@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, CheckCircle, XCircle, ChevronDown } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, ChevronDown, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -209,9 +209,11 @@ export default function JobDetail() {
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">Proof URL</p>
             {job.proof_url ? (
-              <a href={job.proof_url} target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium mt-1 inline-block">
-                View Proof
-              </a>
+              <Button variant="outline" size="sm" asChild className="mt-1">
+                <a href={job.proof_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-1" /> View Proof
+                </a>
+              </Button>
             ) : (
               <p className="font-medium mt-1 text-muted-foreground">Not generated</p>
             )}

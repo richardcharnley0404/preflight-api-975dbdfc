@@ -2,30 +2,32 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, CreditCard } from "lucide-react";
-
-const currentPlan = {
-  name: "Free",
-  jobsUsed: 32,
-  jobsLimit: 50,
-  keysUsed: 2,
-  keysLimit: 1,
-};
-
-const plans = [
-  { name: "Free", price: "$0", jobs: "50/mo", keys: "1", current: true },
-  { name: "Pro", price: "$49", jobs: "500/mo", keys: "5", current: false },
-  { name: "Enterprise", price: "Custom", jobs: "Unlimited", keys: "Unlimited", current: false },
-];
-
-const invoices = [
-  { id: "inv_001", date: "2026-03-01", amount: "$0.00", status: "Paid" },
-  { id: "inv_002", date: "2026-02-01", amount: "$0.00", status: "Paid" },
-];
+import { useBillingInfo } from "@/hooks/useApiData";
 
 export default function Billing() {
-  const usagePercent = (currentPlan.jobsUsed / currentPlan.jobsLimit) * 100;
+  const { data, isLoading } = useBillingInfo();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Billing</h1>
+          <p className="text-muted-foreground">Manage your plan and billing</p>
+        </div>
+        <Skeleton className="h-32" />
+        <Skeleton className="h-64" />
+        <Skeleton className="h-48" />
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const { current_plan, plans, invoices } = data;
+  const usagePercent = (current_plan.jobs_used / current_plan.jobs_limit) * 100;
 
   return (
     <div className="space-y-6">
@@ -40,16 +42,16 @@ export default function Billing() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Current Plan</CardTitle>
-              <CardDescription>You are on the <span className="font-medium text-foreground">{currentPlan.name}</span> plan</CardDescription>
+              <CardDescription>You are on the <span className="font-medium text-foreground">{current_plan.name}</span> plan</CardDescription>
             </div>
-            <Badge variant="secondary" className="text-sm">{currentPlan.name}</Badge>
+            <Badge variant="secondary" className="text-sm">{current_plan.name}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span>Jobs used</span>
-              <span>{currentPlan.jobsUsed} / {currentPlan.jobsLimit}</span>
+              <span>{current_plan.jobs_used} / {current_plan.jobs_limit}</span>
             </div>
             <Progress value={usagePercent} className="h-2" />
           </div>
@@ -108,6 +110,13 @@ export default function Billing() {
                   <TableCell><Badge variant="secondary">{inv.status}</Badge></TableCell>
                 </TableRow>
               ))}
+              {invoices.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    No invoices yet
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

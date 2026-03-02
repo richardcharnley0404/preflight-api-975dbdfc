@@ -1,1 +1,4 @@
 project_id = "bjchkbkfkpmsuqvuxlwp"
+
+[functions.preflight-webhook]
+verify_jwt = false

@@ -150,9 +150,9 @@ export function useSubmitJob() {
 export interface ApiKey {
   id: string;
   name: string;
-  key: string;
-  created: string;
-  last_used: string;
+  prefix: string;
+  created_at: string;
+  last_used_at?: string;
   active: boolean;
 }
 
@@ -160,7 +160,8 @@ export interface CreateKeyResponse {
   id: string;
   name: string;
   key: string;
-  created: string;
+  prefix: string;
+  created_at: string;
 }
 
 export function useApiKeys() {

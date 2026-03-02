@@ -1,69 +1,148 @@
-import { useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Upload, FileUp, CheckCircle, AlertCircle, X } from "lucide-react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useSubmitJob } from "@/hooks/useApiData";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 
-const ACCEPTED_TYPES = [
-  "application/pdf",
-  "image/tiff",
-  "image/png",
-  "image/jpeg",
-  "application/postscript",
-];
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useSubmitJob, type SubmitJobPayload } from "@/hooks/useApiData";
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+// ─── Schema ───
+
+const pageSchema = z.object({
+  type: z.enum(["combined", "front", "back"]),
+  range: z.string().min(1, "Required"),
+  trim: z.object({
+    width: z.coerce.number().positive("Must be > 0"),
+    height: z.coerce.number().positive("Must be > 0"),
+  }),
+  bleed: z.object({
+    left: z.coerce.number().min(0),
+    right: z.coerce.number().min(0),
+    top: z.coerce.number().min(0),
+    bottom: z.coerce.number().min(0),
+  }),
+  safe_zone: z.object({
+    left: z.coerce.number().min(0),
+    right: z.coerce.number().min(0),
+    top: z.coerce.number().min(0),
+    bottom: z.coerce.number().min(0),
+  }),
+});
+
+const formSchema = z.object({
+  job_id: z.string().optional(),
+  artwork_url: z.string().url("Must be a valid URL"),
+  artwork_filename: z.string().min(1, "Required"),
+  webhook_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  webhook_secret: z.string().optional(),
+  proof_generate: z.boolean(),
+  proof_expires_hours: z.coerce.number().int().positive().optional(),
+  units: z.enum(["mm", "in"]),
+  min_dpi: z.coerce.number().int().positive(),
+  colour_space: z.enum(["any", "CMYK", "RGB"]),
+  font_check: z.boolean(),
+  dimension_tolerance_mm: z.coerce.number().positive(),
+  page_count_min: z.coerce.number().int().positive(),
+  page_count_max: z.coerce.number().int().positive(),
+  page_count_must_be_even: z.boolean(),
+  pages: z.array(pageSchema).min(1, "At least one page spec is required"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+const DEFAULT_PAGE = {
+  type: "combined" as const,
+  range: "all",
+  trim: { width: 210, height: 297 },
+  bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+  safe_zone: { left: 5, right: 5, top: 5, bottom: 5 },
+};
+
+const DEFAULTS: FormValues = {
+  job_id: "",
+  artwork_url: "",
+  artwork_filename: "",
+  webhook_url: "",
+  webhook_secret: "",
+  proof_generate: false,
+  proof_expires_hours: 24,
+  units: "mm",
+  min_dpi: 300,
+  colour_space: "any",
+  font_check: false,
+  dimension_tolerance_mm: 0.5,
+  page_count_min: 1,
+  page_count_max: 100,
+  page_count_must_be_even: false,
+  pages: [DEFAULT_PAGE],
+};
+
+// ─── Helpers ───
+
+function buildPayload(v: FormValues): SubmitJobPayload {
+  const payload: SubmitJobPayload = {
+    artwork: { url: v.artwork_url, filename: v.artwork_filename },
+    spec: {
+      units: v.units,
+      pages: v.pages as SubmitJobPayload["spec"]["pages"],
+      page_count: {
+        min: v.page_count_min,
+        max: v.page_count_max,
+        must_be_even: v.page_count_must_be_even,
+      },
+      min_dpi: v.min_dpi,
+      colour_space: v.colour_space,
+      font_check: v.font_check,
+      dimension_tolerance_mm: v.dimension_tolerance_mm,
+    },
+  };
+  if (v.job_id) payload.job_id = v.job_id;
+  if (v.webhook_url) payload.webhook = { url: v.webhook_url, secret: v.webhook_secret || "" };
+  payload.proof = { generate: v.proof_generate, expires_hours: v.proof_expires_hours || 24 };
+  return payload;
+}
+
+// ─── Component ───
 
 export default function SubmitJob() {
-  const [file, setFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const navigate = useNavigate();
   const submitJob = useSubmitJob();
 
-  const validateFile = (f: File): string | null => {
-    if (!ACCEPTED_TYPES.includes(f.type) && !f.name.match(/\.(pdf|tiff?|png|jpe?g|eps|ai)$/i)) {
-      return "Unsupported file type. Please upload a PDF, TIFF, PNG, JPEG, EPS, or AI file.";
-    }
-    if (f.size > MAX_FILE_SIZE) {
-      return "File too large. Maximum size is 100MB.";
-    }
-    return null;
-  };
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: DEFAULTS,
+  });
 
-  const handleFile = (f: File) => {
-    const error = validateFile(f);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-    setFile(f);
-  };
+  const { fields, append, remove } = useFieldArray({ control, name: "pages" });
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    if (e.dataTransfer.files?.[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setDragActive(false);
-  }, []);
-
-  const handleSubmit = async () => {
-    if (!file) return;
+  const onSubmit = async (values: FormValues) => {
     try {
-      const result = await submitJob.mutateAsync(file);
+      const result = await submitJob.mutateAsync(buildPayload(values));
       toast.success("Job submitted successfully!");
       navigate(`/dashboard/jobs/${result.id}`);
     } catch {
@@ -71,128 +150,287 @@ export default function SubmitJob() {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold">Submit Job</h1>
-        <p className="text-muted-foreground">Upload a print file for preflight checking</p>
+        <p className="text-muted-foreground">Configure and submit a preflight job</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Upload File</CardTitle>
-          <CardDescription>
-            Supported formats: PDF, TIFF, PNG, JPEG, EPS, AI — Max 100MB
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!file ? (
-            <label
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              className={`flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed p-12 cursor-pointer transition-colors ${
-                dragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
-              }`}
-            >
-              <div className="rounded-full bg-muted p-4">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium">
-                  Drag & drop your file here, or{" "}
-                  <span className="text-primary underline underline-offset-2">browse</span>
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  PDF, TIFF, PNG, JPEG, EPS, AI up to 100MB
-                </p>
-              </div>
-              <input
-                type="file"
-                className="hidden"
-                accept=".pdf,.tiff,.tif,.png,.jpg,.jpeg,.eps,.ai"
-                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-            </label>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-md bg-primary/10 p-2">
-                    <FileUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Ready
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setFile(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {submitJob.isPending && (
-                <div className="space-y-2">
-                  <Progress value={undefined} className="h-2" />
-                  <p className="text-sm text-muted-foreground">Uploading and processing…</p>
-                </div>
-              )}
-
-              {submitJob.isError && (
-                <div className="flex items-center gap-2 text-destructive text-sm">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Upload failed. Please try again.</span>
-                </div>
-              )}
-
-              {submitJob.isSuccess && (
-                <div className="flex items-center gap-2 text-success text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Job submitted! Redirecting…</span>
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitJob.isPending}
-                  className="flex-1"
-                >
-                  {submitJob.isPending ? "Submitting…" : "Submit for Preflight"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setFile(null);
-                    submitJob.reset();
-                  }}
-                  disabled={submitJob.isPending}
-                >
-                  Cancel
-                </Button>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Artwork */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Artwork</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Job ID (optional)</Label>
+                <Input {...register("job_id")} placeholder="e.g. test-002" />
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Artwork URL *</Label>
+                <Input {...register("artwork_url")} placeholder="https://..." />
+                {errors.artwork_url && (
+                  <p className="text-sm text-destructive">{errors.artwork_url.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Filename *</Label>
+                <Input {...register("artwork_filename")} placeholder="file.pdf" />
+                {errors.artwork_filename && (
+                  <p className="text-sm text-destructive">{errors.artwork_filename.message}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Webhook (collapsible) */}
+        <Collapsible>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Webhook (optional)</CardTitle>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>URL</Label>
+                  <Input {...register("webhook_url")} placeholder="https://..." />
+                  {errors.webhook_url && (
+                    <p className="text-sm text-destructive">{errors.webhook_url.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Secret</Label>
+                  <Input {...register("webhook_secret")} placeholder="secret" />
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Proof (collapsible) */}
+        <Collapsible>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Proof Settings (optional)</CardTitle>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={watch("proof_generate")}
+                    onCheckedChange={(v) => setValue("proof_generate", v)}
+                  />
+                  <Label>Generate proof</Label>
+                </div>
+                <div className="space-y-1">
+                  <Label>Expiry (hours)</Label>
+                  <Input
+                    type="number"
+                    className="w-24"
+                    {...register("proof_expires_hours")}
+                  />
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Specifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Specifications</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Units</Label>
+                <Select
+                  value={watch("units")}
+                  onValueChange={(v) => setValue("units", v as "mm" | "in")}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mm">mm</SelectItem>
+                    <SelectItem value="in">in</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Min DPI</Label>
+                <Input type="number" {...register("min_dpi")} />
+                {errors.min_dpi && <p className="text-sm text-destructive">{errors.min_dpi.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Colour Space</Label>
+                <Select
+                  value={watch("colour_space")}
+                  onValueChange={(v) => setValue("colour_space", v as "any" | "CMYK" | "RGB")}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Any</SelectItem>
+                    <SelectItem value="CMYK">CMYK</SelectItem>
+                    <SelectItem value="RGB">RGB</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={watch("font_check")}
+                  onCheckedChange={(v) => setValue("font_check", v)}
+                />
+                <Label>Font check</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Dimension tolerance (mm)</Label>
+                <Input type="number" step="0.1" {...register("dimension_tolerance_mm")} />
+              </div>
+            </div>
+
+            {/* Page Count */}
+            <div className="border-t pt-4">
+              <Label className="text-sm font-medium">Page Count</Label>
+              <div className="grid gap-4 sm:grid-cols-3 mt-2">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Min</Label>
+                  <Input type="number" {...register("page_count_min")} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Max</Label>
+                  <Input type="number" {...register("page_count_max")} />
+                </div>
+                <div className="flex items-center gap-2 pt-5">
+                  <Switch
+                    checked={watch("page_count_must_be_even")}
+                    onCheckedChange={(v) => setValue("page_count_must_be_even", v)}
+                  />
+                  <Label>Must be even</Label>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pages */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium">Pages</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => append(DEFAULT_PAGE)}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Add Page
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {errors.pages?.root && (
+              <p className="text-sm text-destructive">{errors.pages.root.message}</p>
+            )}
+            {fields.map((field, i) => (
+              <div key={field.id} className="rounded-lg border p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Page {i + 1}</span>
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => remove(i)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Type</Label>
+                    <Select
+                      value={watch(`pages.${i}.type`)}
+                      onValueChange={(v) =>
+                        setValue(`pages.${i}.type`, v as "combined" | "front" | "back")
+                      }
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="combined">Combined</SelectItem>
+                        <SelectItem value="front">Front</SelectItem>
+                        <SelectItem value="back">Back</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Range</Label>
+                    <Input {...register(`pages.${i}.range`)} placeholder='e.g. "all" or "1-4"' />
+                  </div>
+                </div>
+
+                {/* Trim */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Trim</Label>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <Input type="number" step="0.1" placeholder="Width" {...register(`pages.${i}.trim.width`)} />
+                    <Input type="number" step="0.1" placeholder="Height" {...register(`pages.${i}.trim.height`)} />
+                  </div>
+                </div>
+
+                {/* Bleed */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Bleed</Label>
+                  <div className="grid grid-cols-4 gap-2 mt-1">
+                    <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.bleed.left`)} />
+                    <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.bleed.right`)} />
+                    <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.bleed.top`)} />
+                    <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.bleed.bottom`)} />
+                  </div>
+                </div>
+
+                {/* Safe Zone */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Safe Zone</Label>
+                  <div className="grid grid-cols-4 gap-2 mt-1">
+                    <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.safe_zone.left`)} />
+                    <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.safe_zone.right`)} />
+                    <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.safe_zone.top`)} />
+                    <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.safe_zone.bottom`)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Submit */}
+        <div className="flex gap-3">
+          <Button type="submit" className="flex-1" disabled={submitJob.isPending}>
+            {submitJob.isPending ? "Submitting…" : "Submit Job"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/dashboard/jobs")}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

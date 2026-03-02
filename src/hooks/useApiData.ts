@@ -104,6 +104,30 @@ export function useJobDetail(jobId: string | undefined) {
 }
 
 // ─── Submit Job ───
+export interface PageSpec {
+  type: "combined" | "front" | "back";
+  range: string;
+  trim: { width: number; height: number };
+  bleed: { left: number; right: number; top: number; bottom: number };
+  safe_zone: { left: number; right: number; top: number; bottom: number };
+}
+
+export interface SubmitJobPayload {
+  job_id?: string;
+  artwork: { url: string; filename: string };
+  webhook?: { url: string; secret: string };
+  proof?: { generate: boolean; expires_hours: number };
+  spec: {
+    units: "mm" | "in";
+    pages: PageSpec[];
+    page_count: { min: number; max: number; must_be_even: boolean };
+    min_dpi: number;
+    colour_space: "any" | "CMYK" | "RGB";
+    font_check: boolean;
+    dimension_tolerance_mm: number;
+  };
+}
+
 export interface SubmitJobResponse {
   id: string;
   filename: string;
@@ -113,7 +137,8 @@ export interface SubmitJobResponse {
 export function useSubmitJob() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => apiUpload<SubmitJobResponse>("/api/jobs", file),
+    mutationFn: (payload: SubmitJobPayload) =>
+      apiPost<SubmitJobResponse>("/api/jobs", payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });

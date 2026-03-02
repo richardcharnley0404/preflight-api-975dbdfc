@@ -1,58 +1,60 @@
 
 
-# Create `jobs` table and `preflight-webhook` Edge Function
+# Fix Job Detail Page: Show Full Preflight Check Breakdown
 
-## 1. Database Migration: Create `jobs` table
+## Problem
 
-Create a `jobs` table with the columns you specified:
+The `checks` data from Railway is an **object** (keyed by check name), not an array. The current code tries to render it as an array, so no checks are displayed. The Proof URL card also just shows "Available" or a dash instead of a clickable link or "Not generated".
 
-```text
-jobs
-  id              UUID (PK, default gen_random_uuid())
-  user_id         UUID (references auth.users, not null)
-  job_id          TEXT (unique, the external Railway job ID)
-  filename        TEXT
-  status          TEXT (default 'pending')
-  passed          BOOLEAN
-  proof_url       TEXT
-  checks          JSONB
-  submitted_at    TIMESTAMPTZ (default now())
-  completed_at    TIMESTAMPTZ
-```
-
-RLS policies:
-- Users can SELECT their own jobs (`user_id = auth.uid()`)
-- Users can INSERT their own jobs (`user_id = auth.uid()`)
-
-No user-facing UPDATE/DELETE policies needed -- updates come from the webhook via service role.
-
-## 2. Create Edge Function: `supabase/functions/preflight-webhook/index.ts`
-
-The function will:
-1. Handle CORS (OPTIONS returns 200)
-2. Reject non-POST requests with 405
-3. Verify `X-Webhook-Secret` header against `PREFLIGHT_WEBHOOK_SECRET` secret -- return 401 on mismatch
-4. Parse JSON body: `{ job_id, status, passed, proof_url, proof_expires_at, summary, checks }`
-5. Use a Supabase **service role** client to update the matching job by `job_id` with: `status`, `passed`, `proof_url`, `checks`, and `completed_at = now()`
-6. Return 404 if no job matches
-7. Return 200 on success
-
-## 3. Update `supabase/config.toml`
-
-Add JWT bypass so Railway can call the webhook without a Supabase token:
+## Actual data structure from Railway
 
 ```text
-[functions.preflight-webhook]
-verify_jwt = false
+checks = {
+  dimensions:   { passed: bool, details: [{ message, page, ... }] }
+  page_count:   { passed: bool, expected_min, expected_max }
+  bleed:        { passed: bool, details: [{ message, page, edge, ... }] }
+  safe_zone:    { passed: bool, warnings: [] }
+  resolution:   { passed: bool, pages_failed: [{ message, dpi, page, ... }], min_required_dpi }
+  colour_space: { passed: bool, required, pages_failed: [{ message }] }
+  fonts:        { passed: bool, details: [...] }
+}
 ```
 
-## 4. Request `PREFLIGHT_WEBHOOK_SECRET`
+Each check has `passed: boolean` and failure details in varying fields (`details`, `pages_failed`, or `warnings` arrays, each item having a `message` string).
 
-Use the secrets tool to ask you to set the shared secret that Railway will send in the `X-Webhook-Secret` header.
+## Changes (single file: `src/pages/JobDetail.tsx`)
+
+### 1. Update TypeScript interfaces
+
+Replace the flat `JobCheck` interface with types matching the real structure:
+- `CheckEntry`: `{ passed: boolean; details?: { message: string }[]; pages_failed?: { message: string }[]; warnings?: { message: string }[]; message?: string }`
+- `ChecksMap`: `Record<string, CheckEntry>`
+
+### 2. Parse checks as an object
+
+Replace the current `Array.isArray(job.checks)` logic with:
+- Cast `job.checks` to `ChecksMap` (an object)
+- Convert to an ordered array of `[name, checkData]` entries using a display-order list: Dimensions, Page Count, Bleed, Safe Zone, Resolution, Colour Space, Fonts
+- Format the key names nicely (e.g., `colour_space` becomes "Colour Space")
+
+### 3. Render each check with pass/fail and expandable details
+
+For each check entry:
+- Show a pass (green check) or fail (red X) icon based on `passed`
+- Show the check name (formatted)
+- If failed, show the detail messages from whichever array is present (`details`, `pages_failed`, or `warnings`), collapsible if more than 3 items to avoid overwhelming the UI
+
+### 4. Fix the Proof URL metadata card
+
+Replace the current `{ label: "Proof URL", value: job.proof_url ? "Available" : "-" }` with:
+- If `proof_url` exists: render a clickable link ("View Proof")
+- If not: show "Not generated"
+
+Remove the separate standalone proof card since the metadata card will handle it.
 
 ## Technical details
 
-- The edge function uses `Deno.env.get('SUPABASE_URL')` and `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` (both already available) to create a service-role client that bypasses RLS for the update.
-- The `job_id` column is marked `UNIQUE` so lookups are fast and we can use `.eq('job_id', ...)` confidently.
-- No changes to frontend code in this step -- the webhook is a backend-only receiver.
+- Uses Radix `Collapsible` component (already installed) for expandable detail lists
+- No database or backend changes needed
+- Normalizes the varying detail field names (`details` / `pages_failed` / `warnings`) into a single messages array for rendering
 

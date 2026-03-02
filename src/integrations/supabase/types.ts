@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      jobs: {
+        Row: {
+          checks: Json | null
+          completed_at: string | null
+          filename: string | null
+          id: string
+          job_id: string | null
+          passed: boolean | null
+          proof_url: string | null
+          status: string
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          checks?: Json | null
+          completed_at?: string | null
+          filename?: string | null
+          id?: string
+          job_id?: string | null
+          passed?: boolean | null
+          proof_url?: string | null
+          status?: string
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          checks?: Json | null
+          completed_at?: string | null
+          filename?: string | null
+          id?: string
+          job_id?: string | null
+          passed?: boolean | null
+          proof_url?: string | null
+          status?: string
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           billing_address: string | null

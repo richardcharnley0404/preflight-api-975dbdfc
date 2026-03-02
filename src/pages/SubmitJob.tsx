@@ -81,7 +81,7 @@ const DEFAULTS: FormValues = {
   artwork_url: "",
   artwork_filename: "",
   proof_generate: false,
-  proof_expires_hours: 24,
+  proof_expires_hours: 72,
   units: "mm",
   min_dpi: 300,
   colour_space: "any",
@@ -262,36 +262,31 @@ export default function SubmitJob() {
         </Card>
 
 
-        {/* Proof (collapsible) */}
-        <Collapsible>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Proof Settings (optional)</CardTitle>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={watch("proof_generate")}
-                    onCheckedChange={(v) => setValue("proof_generate", v)}
-                  />
-                  <Label>Generate proof</Label>
-                </div>
-                <div className="space-y-1">
-                  <Label>Expiry (hours)</Label>
-                  <Input
-                    type="number"
-                    className="w-24"
-                    {...register("proof_expires_hours")}
-                  />
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+        {/* Proof */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Proof Viewer</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={watch("proof_generate")}
+                onCheckedChange={(v) => setValue("proof_generate", v)}
+              />
+              <Label>Generate proof viewer</Label>
+            </div>
+            {watch("proof_generate") && (
+              <div className="space-y-1">
+                <Label>Expiry (hours)</Label>
+                <Input
+                  type="number"
+                  className="w-24"
+                  {...register("proof_expires_hours")}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Specifications */}
         <Card>

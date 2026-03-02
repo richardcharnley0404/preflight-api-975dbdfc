@@ -53,8 +53,6 @@ const formSchema = z.object({
   job_id: z.string().optional(),
   artwork_url: z.string().url("Must be a valid URL"),
   artwork_filename: z.string().min(1, "Required"),
-  webhook_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  webhook_secret: z.string().optional(),
   proof_generate: z.boolean(),
   proof_expires_hours: z.coerce.number().int().positive().optional(),
   units: z.enum(["mm", "in"]),
@@ -82,8 +80,6 @@ const DEFAULTS: FormValues = {
   job_id: "",
   artwork_url: "",
   artwork_filename: "",
-  webhook_url: "",
-  webhook_secret: "",
   proof_generate: false,
   proof_expires_hours: 24,
   units: "mm",
@@ -98,6 +94,8 @@ const DEFAULTS: FormValues = {
 };
 
 // ─── Helpers ───
+
+const WEBHOOK_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/preflight-webhook`;
 
 function buildPayload(v: FormValues): SubmitJobPayload {
   const payload: SubmitJobPayload = {
@@ -117,7 +115,7 @@ function buildPayload(v: FormValues): SubmitJobPayload {
     },
   };
   if (v.job_id) payload.job_id = v.job_id;
-  if (v.webhook_url) payload.webhook = { url: v.webhook_url, secret: v.webhook_secret || "" };
+  payload.webhook = { url: WEBHOOK_URL, secret: "" };
   payload.proof = { generate: v.proof_generate, expires_hours: v.proof_expires_hours || 24 };
   return payload;
 }
@@ -246,32 +244,6 @@ export default function SubmitJob() {
           </CardContent>
         </Card>
 
-        {/* Webhook (collapsible) */}
-        <Collapsible>
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Webhook (optional)</CardTitle>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>URL</Label>
-                  <Input {...register("webhook_url")} placeholder="https://..." />
-                  {errors.webhook_url && (
-                    <p className="text-sm text-destructive">{errors.webhook_url.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Secret</Label>
-                  <Input {...register("webhook_secret")} placeholder="secret" />
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
 
         {/* Proof (collapsible) */}
         <Collapsible>

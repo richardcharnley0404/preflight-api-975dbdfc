@@ -157,7 +157,7 @@ export default function Dashboard() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : recentJobs ? (
+            ) : recentJobs && Array.isArray(recentJobs) && recentJobs.length > 0 ? (
               <div className="space-y-3">
                 {recentJobs.map((job) => (
                   <div key={job.id} className="flex items-center justify-between py-2 border-b last:border-0">

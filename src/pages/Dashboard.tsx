@@ -31,7 +31,7 @@ export default function Dashboard() {
   const { data: recentJobs, isLoading: jobsLoading } = useRecentJobs();
   const { data: dailyVolume, isLoading: volumeLoading } = useDailyVolume();
 
-  const usagePercent = stats ? (stats.jobs_this_month / stats.plan_limit) * 100 : 0;
+  const usagePercent = stats && stats.plan_limit > 0 ? (stats.jobs_this_month / stats.plan_limit) * 100 : 0;
 
   return (
     <div className="space-y-6">

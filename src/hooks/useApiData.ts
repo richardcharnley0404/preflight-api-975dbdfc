@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiDelete, apiUpload } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 // ─── Dashboard ───
 export interface DashboardStats {
@@ -137,8 +138,24 @@ export interface SubmitJobResponse {
 export function useSubmitJob() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: SubmitJobPayload) =>
-      apiPost<SubmitJobResponse>("/api/jobs", payload),
+    mutationFn: async (payload: SubmitJobPayload) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-job`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<SubmitJobResponse>;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });

@@ -95,8 +95,6 @@ const DEFAULTS: FormValues = {
 
 // ─── Helpers ───
 
-const WEBHOOK_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/preflight-webhook`;
-
 function buildPayload(v: FormValues): SubmitJobPayload {
   const payload: SubmitJobPayload = {
     artwork: { url: v.artwork_url, filename: v.artwork_filename },
@@ -115,7 +113,7 @@ function buildPayload(v: FormValues): SubmitJobPayload {
     },
   };
   if (v.job_id) payload.job_id = v.job_id;
-  payload.webhook = { url: WEBHOOK_URL, secret: "" };
+  // webhook is injected server-side by the submit-job edge function
   payload.proof = { generate: v.proof_generate, expires_hours: v.proof_expires_hours || 24 };
   return payload;
 }

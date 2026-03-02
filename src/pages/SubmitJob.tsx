@@ -3,7 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Upload, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,6 +128,9 @@ export default function SubmitJob() {
   const navigate = useNavigate();
   const submitJob = useSubmitJob();
 
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const {
     register,
     control,
@@ -137,6 +142,32 @@ export default function SubmitJob() {
     resolver: zodResolver(formSchema),
     defaultValues: DEFAULTS,
   });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Only PDF files are supported");
+      return;
+    }
+    setUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const path = `${session.user.id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from("artwork").upload(path, file);
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("artwork").getPublicUrl(path);
+      setValue("artwork_url", publicUrl);
+      setValue("artwork_filename", file.name);
+      toast.success("PDF uploaded successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const { fields, append, remove } = useFieldArray({ control, name: "pages" });
 
@@ -164,6 +195,32 @@ export default function SubmitJob() {
             <CardTitle className="text-sm font-medium">Artwork</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Upload PDF */}
+            <div className="space-y-2">
+              <Label>Upload PDF</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">or enter a URL below</span>
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Job ID (optional)</Label>

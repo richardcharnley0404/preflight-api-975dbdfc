@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, apiUpload } from "@/lib/api";
 
 // ─── Dashboard ───
 export interface DashboardStats {
@@ -100,6 +100,24 @@ export function useJobDetail(jobId: string | undefined) {
     queryKey: ["job", jobId],
     queryFn: () => apiGet<JobDetail>(`/api/jobs/${jobId}`),
     enabled: !!jobId,
+  });
+}
+
+// ─── Submit Job ───
+export interface SubmitJobResponse {
+  id: string;
+  filename: string;
+  status: string;
+}
+
+export function useSubmitJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => apiUpload<SubmitJobResponse>("/api/jobs", file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 }
 

@@ -15,6 +15,7 @@ import ApiKeys from "./pages/ApiKeys";
 import JobHistory from "./pages/JobHistory";
 import JobDetail from "./pages/JobDetail";
 import Billing from "./pages/Billing";
+import SubmitJob from "./pages/SubmitJob";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="jobs" element={<JobHistory />} />
               <Route path="jobs/:jobId" element={<JobDetail />} />
               <Route path="billing" element={<Billing />} />
+              <Route path="submit" element={<SubmitJob />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

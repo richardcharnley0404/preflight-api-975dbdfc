@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -8,13 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search } from "lucide-react";
-import { useJobHistory } from "@/hooks/useApiData";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 
-function StatusBadge({ status, result }: { status: string; result: string }) {
-  if (status === "processing") return <Badge variant="secondary">Processing</Badge>;
+function StatusBadge({ status, passed }: { status: string; passed: boolean | null }) {
+  if (status === "pending" || status === "queued" || status === "processing")
+    return <Badge variant="secondary">{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>;
   if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
-  if (result === "pass") return <Badge className="bg-success text-success-foreground">Pass</Badge>;
-  return <Badge variant="destructive">Fail</Badge>;
+  if (passed === true) return <Badge className="bg-success text-success-foreground">Pass</Badge>;
+  if (passed === false) return <Badge variant="destructive">Fail</Badge>;
+  return <Badge variant="secondary">{status}</Badge>;
 }
 
 export default function JobHistory() {
@@ -24,11 +28,30 @@ export default function JobHistory() {
   const navigate = useNavigate();
   const perPage = 10;
 
-  const { data, isLoading } = useJobHistory({
-    search: search || undefined,
-    status: statusFilter,
-    page,
-    per_page: perPage,
+  const { data, isLoading } = useQuery({
+    queryKey: ["jobs", { search, statusFilter, page }],
+    queryFn: async () => {
+      let query = supabase
+        .from("jobs")
+        .select("*", { count: "exact" })
+        .order("submitted_at", { ascending: false })
+        .range(page * perPage, (page + 1) * perPage - 1);
+
+      if (search) {
+        query = query.or(`filename.ilike.%${search}%,job_id.ilike.%${search}%`);
+      }
+      if (statusFilter === "pass") {
+        query = query.eq("passed", true);
+      } else if (statusFilter === "fail") {
+        query = query.eq("passed", false);
+      } else if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter);
+      }
+
+      const { data: jobs, count, error } = await query;
+      if (error) throw error;
+      return { jobs: jobs ?? [], total: count ?? 0 };
+    },
   });
 
   const jobs = data?.jobs ?? [];
@@ -60,7 +83,8 @@ export default function JobHistory() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="processing">Processing</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="pass">Pass</SelectItem>
@@ -85,7 +109,6 @@ export default function JobHistory() {
                     <TableHead>Filename</TableHead>
                     <TableHead>Submitted</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Duration</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -95,16 +118,17 @@ export default function JobHistory() {
                       className="cursor-pointer"
                       onClick={() => navigate(`/dashboard/jobs/${job.id}`)}
                     >
-                      <TableCell className="font-mono text-sm">{job.id}</TableCell>
+                      <TableCell className="font-mono text-sm">{job.job_id || job.id.slice(0, 8)}</TableCell>
                       <TableCell className="font-medium">{job.filename}</TableCell>
-                      <TableCell className="text-muted-foreground">{job.submitted}</TableCell>
-                      <TableCell><StatusBadge status={job.status} result={job.result} /></TableCell>
-                      <TableCell className="text-muted-foreground">{job.duration}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(job.submitted_at), "MMM d, yyyy HH:mm")}
+                      </TableCell>
+                      <TableCell><StatusBadge status={job.status} passed={job.passed} /></TableCell>
                     </TableRow>
                   ))}
                   {jobs.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         No jobs found
                       </TableCell>
                     </TableRow>

@@ -129,9 +129,9 @@ export interface SubmitJobPayload {
 }
 
 export interface SubmitJobResponse {
-  id: string;
-  filename: string;
+  job_id: string;
   status: string;
+  created_at?: string;
 }
 
 export function useSubmitJob() {

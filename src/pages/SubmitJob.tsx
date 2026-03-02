@@ -171,9 +171,28 @@ export default function SubmitJob() {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const result = await submitJob.mutateAsync(buildPayload(values));
+      const payload = buildPayload(values);
+      const result = await submitJob.mutateAsync(payload);
+
+      // Insert job row into Supabase so webhook can update it later
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data: jobRow, error: insertError } = await supabase
+        .from("jobs")
+        .insert({
+          user_id: session.user.id,
+          job_id: result.job_id,
+          filename: payload.artwork.filename,
+          status: result.status || "pending",
+        })
+        .select("id")
+        .single();
+
+      if (insertError) throw insertError;
+
       toast.success("Job submitted successfully!");
-      navigate(`/dashboard/jobs/${result.id}`);
+      navigate(`/dashboard/jobs/${jobRow.id}`);
     } catch {
       toast.error("Failed to submit job. Please try again.");
     }

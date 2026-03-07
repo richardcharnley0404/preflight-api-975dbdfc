@@ -253,6 +253,24 @@ export default function ApiDocs() {
         </Button>
       </div>
 
+      {/* Machine-readable spec banner for AI discovery */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="py-4">
+          <p className="text-sm text-foreground">
+            <strong>Machine-readable API spec available:</strong>{" "}
+            <a
+              href="https://preflight-api.lovable.app/api-docs.json"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline font-mono"
+            >
+              https://preflight-api.lovable.app/api-docs.json
+            </a>{" "}
+            <span className="text-muted-foreground">(OpenAPI 3.1 — use this for programmatic / AI integration)</span>
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Table of contents */}
       <Card>
         <CardContent className="py-4">

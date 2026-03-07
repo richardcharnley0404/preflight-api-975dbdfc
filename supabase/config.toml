@@ -2,3 +2,6 @@ project_id = "bjchkbkfkpmsuqvuxlwp"
 
 [functions.preflight-webhook]
 verify_jwt = false
+
+[functions.preflight-proxy]
+verify_jwt = false

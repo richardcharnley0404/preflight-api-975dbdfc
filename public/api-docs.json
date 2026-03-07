@@ -9,6 +9,10 @@
     {
       "url": "https://api.preflight-api.com",
       "description": "Production"
+    },
+    {
+      "url": "https://bjchkbkfkpmsuqvuxlwp.supabase.co/functions/v1/api-jobs",
+      "description": "Direct Edge Function endpoint"
     }
   ],
   "security": [

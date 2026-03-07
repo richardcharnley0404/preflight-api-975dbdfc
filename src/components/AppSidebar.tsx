@@ -1,4 +1,4 @@
-import { LayoutDashboard, Key, FileText, CreditCard, ExternalLink, LogOut, Upload } from "lucide-react";
+import { LayoutDashboard, Key, FileText, CreditCard, ExternalLink, LogOut, Upload, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,7 @@ const navItems = [
   { title: "Submit Job", url: "/dashboard/submit", icon: Upload },
   { title: "API Keys", url: "/dashboard/api-keys", icon: Key },
   { title: "Job History", url: "/dashboard/jobs", icon: FileText },
+  { title: "API Docs", url: "/dashboard/docs", icon: BookOpen },
   { title: "Billing", url: "/dashboard/billing", icon: CreditCard },
 ];
 

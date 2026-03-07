@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
       // Capture caller's webhook URL before overwriting
       const callerWebhookUrl = payload.webhook?.url || null;
       console.log("[api-jobs] Caller webhook URL:", callerWebhookUrl);
+      console.log("[api-jobs] Full webhook object from caller:", JSON.stringify(payload.webhook));
 
       // Always inject this app's webhook so Railway calls back here
       const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");

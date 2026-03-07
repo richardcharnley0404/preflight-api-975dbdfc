@@ -1,29 +1,55 @@
 
-# Add Proof Viewer Option to Submit Job & Job Detail
 
-## What changes
+## Problem
 
-### 1. Submit Job form (`src/pages/SubmitJob.tsx`)
-- Move the "Generate proof" toggle **out of the collapsible** section so it's always visible -- it's an important user-facing option, not an advanced setting
-- Change the default `proof_expires_hours` from `24` to `72`
-- When proof is enabled, show the expiry hours input inline; when disabled, hide it
-- Update `buildPayload` so when `proof_generate` is false, send `generate: false` (already works)
+There are two issues:
 
-### 2. Job Detail page (`src/pages/JobDetail.tsx`)
-- Replace the current "View Proof" text link with a styled `Button` component that opens in a new tab
-- Add an `ExternalLink` icon to make it clear it opens externally
+1. **No job record created for external submissions**: The `jobs` table in the database is only populated when a user submits through the dashboard UI (`SubmitJob.tsx` lines 248-257). When a job is submitted directly to the Railway API (from another source), no record is ever inserted into the database. The webhook (`preflight-webhook`) only does an `UPDATE` on the jobs table — so if the row doesn't exist, the update silently matches zero rows and the result is lost.
 
-### 3. Default values update
-- Change `DEFAULTS.proof_expires_hours` from `24` to `72`
+2. **Proof URL goes nowhere**: The webhook stores `proof_url` on the job row, but since no row exists for external submissions, the proof URL is effectively discarded.
 
-## Technical details
+## Solution
 
-**`src/pages/SubmitJob.tsx`**:
-- Remove the `Collapsible` wrapper around the Proof Settings card
-- Replace with a simple Card containing a Switch for "Generate proof viewer" and a conditionally-shown expiry hours input
-- Update `DEFAULTS.proof_expires_hours` to `72`
-- `buildPayload` already maps `proof_generate` and `proof_expires_hours` correctly -- no change needed there
+Move job record creation into the `preflight-webhook` edge function so that **every** completed job (whether submitted from the dashboard or externally) gets recorded. This means using an **upsert** pattern instead of a plain update.
 
-**`src/pages/JobDetail.tsx`**:
-- Replace the `<a>` tag on line 212 with a `<Button asChild>` wrapping an `<a>` tag, using `variant="outline"` and `size="sm"` with an `ExternalLink` icon
-- Import `ExternalLink` from lucide-react
+### Changes
+
+**1. Update `supabase/functions/preflight-webhook/index.ts`**
+- Change the `.update().eq("job_id", job_id)` to an **upsert**: first try to find an existing row by `job_id`, and if none exists, insert a new one.
+- For external jobs (no existing row), we need the `user_id`. The Railway API should include `user_id` (the Supabase user ID from the JWT) in the webhook payload. If it doesn't currently, we can fall back to looking it up from the API key used, or accept it as a field in the webhook body.
+- Use `supabase.from("jobs").upsert(...)` matching on `job_id` so dashboard-submitted jobs get updated and externally-submitted jobs get created.
+
+**2. Update `supabase/functions/submit-job/index.ts`**
+- Include the authenticated `user_id` in the payload sent to Railway, so Railway can pass it back in the webhook callback. This ensures the webhook knows which user owns the job.
+
+**3. Add database migration**
+- Add a unique constraint on `jobs.job_id` to support upsert on that column.
+
+### Webhook upsert logic (simplified)
+
+```typescript
+// Instead of .update().eq("job_id", job_id):
+const { data, error } = await supabase
+  .from("jobs")
+  .upsert({
+    job_id,
+    user_id,        // from webhook payload
+    filename,       // from webhook payload
+    status,
+    passed,
+    proof_url,
+    checks,
+    completed_at: new Date().toISOString(),
+  }, { onConflict: "job_id" })
+  .select()
+  .single();
+```
+
+### Open question
+
+Does the Railway API currently include `user_id` and `filename` in the webhook callback payload? If not, we need to either:
+- **Option A**: Update the Railway backend to echo back `user_id` and `filename` in the webhook call
+- **Option B**: Have the `submit-job` edge function always create the job row *before* forwarding to Railway (move the insert from `SubmitJob.tsx` into the edge function), and only use upsert in the webhook for external API submissions that include user identification
+
+Option B is more robust — it ensures dashboard submissions always have a job row regardless of webhook timing, and external submissions get captured via upsert.
+

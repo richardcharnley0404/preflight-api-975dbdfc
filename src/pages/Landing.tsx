@@ -54,6 +54,7 @@ export default function Landing() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <Link to="/dashboard/docs" className="hover:text-foreground transition-colors">API Documentation</Link>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
             <Link to="/login" className="hover:text-foreground transition-colors">Log in</Link>
             <Button asChild size="sm">

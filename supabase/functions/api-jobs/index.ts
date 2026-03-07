@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
           job_id: body.job_id,
           status: "queued",
         };
+        if (payload.artwork?.filename) upsertRow.filename = payload.artwork.filename;
         if (callerWebhookUrl) upsertRow.callback_url = callerWebhookUrl;
         if (resolvedUserId) upsertRow.user_id = resolvedUserId;
 

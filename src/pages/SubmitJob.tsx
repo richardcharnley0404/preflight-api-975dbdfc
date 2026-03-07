@@ -155,8 +155,8 @@ function buildPayload(v: FormValues): SubmitJobPayload {
   return payload;
 }
 
-function trimSummary(trim: { width: number; height: number }, units: string) {
-  return `${trim.width}×${trim.height}${units}`;
+function trimSummary(trim: { width?: number; height?: number }, units: string) {
+  return `${trim.width ?? 0}×${trim.height ?? 0}${units}`;
 }
 
 // ─── Component ───

@@ -543,16 +543,24 @@ export default function ApiDocs() {
           <CardHeader>
             <CardTitle className="text-base">Webhook Notifications</CardTitle>
             <CardDescription>
-              Receive job results automatically instead of polling. Include a webhook URL when submitting a job.
+              Job results are delivered automatically — no webhook configuration required on your side.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">Automatic webhooks:</strong> When you submit jobs through the API, result callbacks are configured automatically. Your job results will appear in your dashboard and are available via the <a href="#get-result" className="text-primary hover:underline">GET /v1/jobs/{"{job_id}"}</a> endpoint as soon as processing completes.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Optionally, you can provide your own webhook URL to receive results at a custom endpoint. Include a <code className="bg-muted px-1 rounded text-xs">webhook</code> object in your submission:
+            </p>
             <CodeBlock
               code={`"webhook": {\n  "url": "https://yourapp.com/preflight-webhook",\n  "secret": "whsec_your_hmac_secret"\n}`}
               language="json"
             />
             <p className="text-sm text-muted-foreground">
-              When the job completes, we'll POST the results to your webhook URL. If you provide a <code className="bg-muted px-1 rounded text-xs">secret</code>, we'll include an <code className="bg-muted px-1 rounded text-xs">X-Signature</code> header with an HMAC-SHA256 signature of the payload body.
+              If you provide a <code className="bg-muted px-1 rounded text-xs">secret</code>, we'll include an <code className="bg-muted px-1 rounded text-xs">X-Signature</code> header with an HMAC-SHA256 signature of the payload body.
             </p>
             <div>
               <h4 className="font-medium mb-3 text-foreground">Webhook Payload</h4>

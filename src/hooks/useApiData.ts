@@ -191,7 +191,20 @@ export function useApiKeys() {
 export function useCreateApiKey() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => apiPost<CreateKeyResponse>("/api/keys", { name }),
+    mutationFn: async (name: string) => {
+      const result = await apiPost<CreateKeyResponse>("/api/keys", { name });
+      // Store key-to-user mapping locally
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id && result.id && result.prefix) {
+        await supabase.from("api_keys").insert({
+          user_id: session.user.id,
+          railway_key_id: result.id,
+          prefix: result.prefix,
+          name: name || "Untitled",
+        });
+      }
+      return result;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
   });
 }
@@ -199,7 +212,15 @@ export function useCreateApiKey() {
 export function useRevokeApiKey() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiDelete<void>(`/api/keys/${id}`),
+    mutationFn: async (id: string) => {
+      const result = await apiDelete<void>(`/api/keys/${id}`);
+      // Mark local key as revoked
+      await supabase
+        .from("api_keys")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("railway_key_id", id);
+      return result;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
   });
 }

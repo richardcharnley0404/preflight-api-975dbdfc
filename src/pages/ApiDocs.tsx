@@ -541,30 +541,51 @@ export default function ApiDocs() {
       <Section id="webhooks" title="Webhooks">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Webhook Notifications</CardTitle>
+            <CardTitle className="text-base">Receiving Results via Webhook</CardTitle>
             <CardDescription>
-              Job results are delivered automatically — no webhook configuration required on your side.
+              Get preflight results pushed to your application automatically when processing completes.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Automatic webhooks:</strong> When you submit jobs through the API, result callbacks are configured automatically. Your job results will appear in your dashboard and are available via the <a href="#get-result" className="text-primary hover:underline">GET /v1/jobs/{"{job_id}"}</a> endpoint as soon as processing completes.
+                <strong className="text-foreground">How it works:</strong> When you submit a job, results are always saved to your dashboard and available via <a href="#get-result" className="text-primary hover:underline">GET /v1/jobs/{"{job_id}"}</a>. If you also want results pushed directly to your application, include a <code className="bg-muted px-1 rounded text-xs">webhook</code> object with a <code className="bg-muted px-1 rounded text-xs">url</code> in your submission payload.
               </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Optionally, you can provide your own webhook URL to receive results at a custom endpoint. Include a <code className="bg-muted px-1 rounded text-xs">webhook</code> object in your submission:
-            </p>
-            <CodeBlock
-              code={`"webhook": {\n  "url": "https://yourapp.com/preflight-webhook",\n  "secret": "whsec_your_hmac_secret"\n}`}
-              language="json"
-            />
-            <p className="text-sm text-muted-foreground">
-              If you provide a <code className="bg-muted px-1 rounded text-xs">secret</code>, we'll include an <code className="bg-muted px-1 rounded text-xs">X-Signature</code> header with an HMAC-SHA256 signature of the payload body.
-            </p>
+
+            <div>
+              <h4 className="font-medium mb-3 text-foreground">Callback URL</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                To receive results at your own endpoint, include a <code className="bg-muted px-1 rounded text-xs">webhook.url</code> in your job submission. When the job completes, we'll POST the results to this URL.
+              </p>
+              <CodeBlock
+                code={`// Include in your POST /v1/jobs payload:\n"webhook": {\n  "url": "https://yourapp.com/preflight-webhook"\n}`}
+                language="json"
+              />
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 text-foreground">Full Example with Callback</h4>
+              <CodeBlock
+                code={`curl -X POST ${BASE_URL}/v1/jobs \\\n  -H "X-API-Key: your_api_key" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "artwork": {\n      "url": "https://example.com/artwork.pdf",\n      "filename": "business-card.pdf"\n    },\n    "webhook": {\n      "url": "https://yourapp.com/preflight-webhook"\n    },\n    "spec": {\n      "units": "mm",\n      "pages": [{\n        "type": "combined",\n        "range": "1",\n        "trim": { "width": 90, "height": 55 },\n        "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 }\n      }],\n      "min_dpi": 300,\n      "colour_space": "CMYK"\n    }\n  }'`}
+              />
+            </div>
+
             <div>
               <h4 className="font-medium mb-3 text-foreground">Webhook Payload</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                Your endpoint will receive a POST request with the following JSON body:
+              </p>
               <CodeBlock code={webhookExample} language="json" />
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">No webhook?</strong> No problem. You can always poll for results using <a href="#get-result" className="text-primary hover:underline">GET /v1/jobs/{"{job_id}"}</a> instead.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">Tip:</strong> Your webhook endpoint should return a 200 status code to acknowledge receipt. Failed deliveries are not retried.
+              </p>
             </div>
           </CardContent>
         </Card>

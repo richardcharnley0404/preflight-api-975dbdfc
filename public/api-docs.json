@@ -51,13 +51,14 @@
       },
       "PageSpec": {
         "type": "object",
+        "description": "Defines the expected dimensions and margins for a range of pages in the PDF. Use multiple PageSpec entries in the pages array to handle documents where different pages have different sizes (e.g. cover vs text pages in a perfect bound book).",
         "required": ["type", "range", "trim"],
         "properties": {
-          "type": { "type": "string", "enum": ["combined", "front", "back"], "example": "combined" },
-          "range": { "type": "string", "example": "1-4" },
+          "type": { "type": "string", "enum": ["combined", "front", "back"], "description": "Whether the artwork contains both sides in one file (combined) or is split into separate front/back files.", "example": "combined" },
+          "range": { "type": "string", "description": "Which pages this spec applies to. Examples: \"1\" (page 1 only), \"1-4\" (pages 1–4), \"2-100\", \"all\".", "example": "1-4" },
           "trim": { "$ref": "#/components/schemas/TrimSize" },
           "bleed": { "$ref": "#/components/schemas/BleedSpec" },
-          "safe_zone": { "$ref": "#/components/schemas/SafeZoneSpec" }
+          "safe_zone": { "$ref": "#/components/schemas/SafeZoneSpec", "description": "Inset from the trim edge where important content (text, logos) should stay to avoid being cut." }
         }
       },
       "SubmitJobRequest": {
@@ -162,7 +163,36 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/SubmitJobRequest" }
+              "schema": { "$ref": "#/components/schemas/SubmitJobRequest" },
+              "examples": {
+                "simple": {
+                  "summary": "Single page spec (business card)",
+                  "value": {
+                    "artwork": { "url": "https://example.com/artwork.pdf", "filename": "business-card.pdf" },
+                    "spec": {
+                      "units": "mm",
+                      "pages": [{ "type": "combined", "range": "1", "trim": { "width": 90, "height": 55 }, "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 } }],
+                      "min_dpi": 300,
+                      "colour_space": "CMYK"
+                    }
+                  }
+                },
+                "perfectBoundBook": {
+                  "summary": "Multi-page spec (perfect bound A4 book)",
+                  "value": {
+                    "artwork": { "url": "https://example.com/book.pdf", "filename": "book-a4.pdf" },
+                    "spec": {
+                      "units": "mm",
+                      "pages": [
+                        { "type": "combined", "range": "1", "trim": { "width": 425, "height": 297 }, "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 }, "safe_zone": { "left": 10, "right": 10, "top": 10, "bottom": 10 } },
+                        { "type": "combined", "range": "2-100", "trim": { "width": 210, "height": 297 }, "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 }, "safe_zone": { "left": 5, "right": 5, "top": 5, "bottom": 5 } }
+                      ],
+                      "min_dpi": 300,
+                      "colour_space": "CMYK"
+                    }
+                  }
+                }
+              }
             }
           }
         },

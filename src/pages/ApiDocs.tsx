@@ -90,6 +90,74 @@ const jsSubmit = `const response = await fetch("${BASE_URL}/v1/jobs", {
 
 const { job_id, status } = await response.json();`;
 
+const curlMultiPage = `curl -X POST ${BASE_URL}/v1/jobs \\
+  -H "X-API-Key: your_api_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "artwork": {
+      "url": "https://example.com/perfect-bound-book.pdf",
+      "filename": "book-a4.pdf"
+    },
+    "spec": {
+      "units": "mm",
+      "pages": [
+        {
+          "type": "combined",
+          "range": "1",
+          "trim": { "width": 425, "height": 297 },
+          "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 },
+          "safe_zone": { "left": 10, "right": 10, "top": 10, "bottom": 10 }
+        },
+        {
+          "type": "combined",
+          "range": "2-100",
+          "trim": { "width": 210, "height": 297 },
+          "bleed": { "left": 3, "right": 3, "top": 3, "bottom": 3 },
+          "safe_zone": { "left": 5, "right": 5, "top": 5, "bottom": 5 }
+        }
+      ],
+      "min_dpi": 300,
+      "colour_space": "CMYK"
+    }
+  }'`;
+
+const jsMultiPage = `const response = await fetch("${BASE_URL}/v1/jobs", {
+  method: "POST",
+  headers: {
+    "X-API-Key": "your_api_key",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    artwork: {
+      url: "https://example.com/perfect-bound-book.pdf",
+      filename: "book-a4.pdf",
+    },
+    spec: {
+      units: "mm",
+      pages: [
+        {
+          type: "combined",
+          range: "1",
+          trim: { width: 425, height: 297 },
+          bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+          safe_zone: { left: 10, right: 10, top: 10, bottom: 10 },
+        },
+        {
+          type: "combined",
+          range: "2-100",
+          trim: { width: 210, height: 297 },
+          bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+          safe_zone: { left: 5, right: 5, top: 5, bottom: 5 },
+        },
+      ],
+      min_dpi: 300,
+      colour_space: "CMYK",
+    },
+  }),
+});
+
+const { job_id } = await response.json();`;
+
 const curlGet = `curl ${BASE_URL}/v1/jobs/{job_id} \\
   -H "X-API-Key: your_api_key"`;
 
@@ -161,6 +229,7 @@ export default function ApiDocs() {
     { id: "quick-start", label: "Quick Start" },
     { id: "authentication", label: "Authentication" },
     { id: "submit-job", label: "Submit a Job" },
+    { id: "multi-page-specs", label: "Multi-Page Specs" },
     { id: "get-result", label: "Get Job Result" },
     { id: "webhooks", label: "Webhooks" },
     { id: "proof-viewer", label: "Proof Viewer" },
@@ -262,7 +331,9 @@ export default function ApiDocs() {
               <Badge variant="secondary" className="mr-2">POST</Badge>
               /v1/jobs
             </CardTitle>
-            <CardDescription>Submit a PDF for preflight checking against your print specification.</CardDescription>
+            <CardDescription>
+              Submit a PDF for preflight checking against your print specification. The <code className="bg-muted px-1 rounded text-xs">pages</code> array supports multiple entries for documents with different page dimensions — see <a href="#multi-page-specs" className="text-primary hover:underline">Multi-Page Specs</a>.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <Tabs defaultValue="curl">
@@ -308,6 +379,97 @@ export default function ApiDocs() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+
+      {/* Multi-Page Specs */}
+      <Section id="multi-page-specs" title="Multi-Page Specifications">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Different Specs per Page Range</CardTitle>
+            <CardDescription>
+              Use multiple entries in the <code className="bg-muted px-1 rounded text-xs">pages</code> array to define different trim sizes, bleed, and safe zones for different page ranges within a single PDF — ideal for perfect bound books, brochures, or any document where covers and text pages differ.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <h4 className="font-medium mb-3 text-foreground">Example: Perfect Bound Book (A4)</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                This example defines two page specs: a cover spread (page 1, 425×297 mm with 10 mm safe zone) and text pages (pages 2–100, 210×297 mm with 5 mm safe zone).
+              </p>
+              <Tabs defaultValue="curl">
+                <TabsList>
+                  <TabsTrigger value="curl">cURL</TabsTrigger>
+                  <TabsTrigger value="js">JavaScript</TabsTrigger>
+                </TabsList>
+                <TabsContent value="curl">
+                  <CodeBlock code={curlMultiPage} />
+                </TabsContent>
+                <TabsContent value="js">
+                  <CodeBlock code={jsMultiPage} language="javascript" />
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 text-foreground">Page Range Syntax</h4>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-3 font-medium text-foreground">Range</th>
+                      <th className="text-left p-3 font-medium text-foreground">Meaning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { range: '"1"', meaning: "Page 1 only" },
+                      { range: '"1-4"', meaning: "Pages 1 through 4" },
+                      { range: '"2-100"', meaning: "Pages 2 through 100" },
+                      { range: '"all"', meaning: "All pages in the document" },
+                    ].map((row) => (
+                      <tr key={row.range} className="border-t">
+                        <td className="p-3 font-mono text-xs text-foreground">{row.range}</td>
+                        <td className="p-3 text-muted-foreground">{row.meaning}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3 text-foreground">Page Type</h4>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-3 font-medium text-foreground">Type</th>
+                      <th className="text-left p-3 font-medium text-foreground">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { type: '"combined"', desc: "Front and back artwork are in the same PDF (e.g. a spread or single-sided)" },
+                      { type: '"front"', desc: "This spec applies to front-side artwork only" },
+                      { type: '"back"', desc: "This spec applies to back-side artwork only" },
+                    ].map((row) => (
+                      <tr key={row.type} className="border-t">
+                        <td className="p-3 font-mono text-xs text-foreground">{row.type}</td>
+                        <td className="p-3 text-muted-foreground">{row.desc}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-sm text-muted-foreground">
+                <strong className="text-foreground">Tip:</strong> Each page in the PDF is matched against the first spec whose range includes it. Define more specific ranges before broader ones for predictable results.
+              </p>
             </div>
           </CardContent>
         </Card>

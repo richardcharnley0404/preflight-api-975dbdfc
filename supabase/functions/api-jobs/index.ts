@@ -89,8 +89,10 @@ Deno.serve(async (req) => {
       };
 
       // Forward to Railway
-      console.log("[api-jobs] Forwarding to Railway:", `${RAILWAY_API}/api/jobs`);
-      const res = await fetch(`${RAILWAY_API}/api/jobs`, {
+      const railwayPath = resolveRailwayPath(url.searchParams.get("path"), "/v1/jobs");
+      console.log("[api-jobs] Railway target path:", railwayPath);
+      console.log("[api-jobs] Forwarding to Railway:", `${RAILWAY_API}${railwayPath}`);
+      const res = await fetch(`${RAILWAY_API}${railwayPath}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

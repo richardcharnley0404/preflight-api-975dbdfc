@@ -242,24 +242,16 @@ export default function SubmitJob() {
       const payload = buildPayload(values);
       const result = await submitJob.mutateAsync(payload);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const { data: jobRow, error: insertError } = await supabase
+      // Job row is now created server-side in submit-job edge function
+      // Query it by job_id to get the DB row id for navigation
+      const { data: jobRow } = await supabase
         .from("jobs")
-        .insert({
-          user_id: session.user.id,
-          job_id: result.job_id,
-          filename: payload.artwork.filename,
-          status: result.status || "pending",
-        })
         .select("id")
+        .eq("job_id", result.job_id)
         .single();
 
-      if (insertError) throw insertError;
-
       toast.success("Job submitted successfully!");
-      navigate(`/dashboard/jobs/${jobRow.id}`);
+      navigate(jobRow ? `/dashboard/jobs/${jobRow.id}` : "/dashboard/jobs");
     } catch {
       toast.error("Failed to submit job. Please try again.");
     }

@@ -128,8 +128,10 @@ Deno.serve(async (req) => {
     }
 
     // GET — forward query params to Railway for list/detail
-    const path = url.searchParams.get("path") || "/api/jobs";
-    const res = await fetch(`${RAILWAY_API}${path}`, {
+    const railwayPath = resolveRailwayPath(url.searchParams.get("path"), "/v1/jobs");
+    console.log("[api-jobs] Railway target path:", railwayPath);
+
+    const res = await fetch(`${RAILWAY_API}${railwayPath}`, {
       method: "GET",
       headers: {
         "X-API-Key": apiKey,

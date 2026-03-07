@@ -26,7 +26,7 @@ export type Database = {
           proof_url: string | null
           status: string
           submitted_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           callback_url?: string | null
@@ -39,7 +39,7 @@ export type Database = {
           proof_url?: string | null
           status?: string
           submitted_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           callback_url?: string | null
@@ -52,7 +52,7 @@ export type Database = {
           proof_url?: string | null
           status?: string
           submitted_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

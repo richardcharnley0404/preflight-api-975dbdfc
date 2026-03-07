@@ -8,6 +8,27 @@ const corsHeaders = {
 
 const RAILWAY_API = "https://preflight-api-production.up.railway.app";
 
+function normalizeApiKey(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.replace(/^Bearer\s+/i, "");
+}
+
+function keyFingerprint(value: string | null) {
+  if (!value) {
+    return { present: false };
+  }
+
+  return {
+    present: true,
+    length: value.length,
+    prefix: value.slice(0, 4),
+    suffix: value.slice(-4),
+    hadWhitespace: value !== value.trim(),
+    hadBearerPrefix: /^Bearer\s+/i.test(value),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -20,7 +41,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const apiKey = req.headers.get("x-api-key");
+  const rawApiKey = req.headers.get("x-api-key") ?? req.headers.get("authorization");
+  const apiKey = normalizeApiKey(rawApiKey);
+  console.log("[api-jobs] Caller key metadata:", JSON.stringify(keyFingerprint(rawApiKey)));
+
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: "Missing X-API-Key header" }),

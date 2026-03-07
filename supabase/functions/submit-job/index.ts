@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
     });
   }
 
+  const userId = claimsData.claims.sub as string;
+
   try {
     const payload = await req.json();
 
@@ -55,6 +57,9 @@ Deno.serve(async (req) => {
       secret: webhookSecret || "",
     };
 
+    // Include user_id so Railway can echo it back in the webhook
+    payload.user_id = userId;
+
     // Forward to Railway
     const res = await fetch(`${RAILWAY_API}/api/jobs`, {
       method: "POST",
@@ -65,8 +70,24 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    const body = await res.text();
-    return new Response(body, {
+    const body = await res.json();
+
+    // If Railway accepted the job, create the row in our DB immediately
+    if (res.ok && body.job_id) {
+      const serviceClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      await serviceClient.from("jobs").insert({
+        user_id: userId,
+        job_id: body.job_id,
+        filename: payload.artwork?.filename || null,
+        status: body.status || "pending",
+      });
+    }
+
+    return new Response(JSON.stringify(body), {
       status: res.status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

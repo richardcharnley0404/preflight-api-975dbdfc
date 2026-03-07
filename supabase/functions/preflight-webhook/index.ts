@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { job_id, status, passed, proof_url, checks } = await req.json();
+    const { job_id, status, passed, proof_url, checks, user_id, filename } = await req.json();
 
     if (!job_id) {
       return new Response(JSON.stringify({ error: "Missing job_id" }), {
@@ -44,24 +44,30 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Build the upsert row — only include user_id/filename if provided
+    const row: Record<string, unknown> = {
+      job_id,
+      status,
+      passed,
+      proof_url,
+      checks,
+      completed_at: new Date().toISOString(),
+    };
+
+    if (user_id) row.user_id = user_id;
+    if (filename) row.filename = filename;
+
     const { data, error } = await supabase
       .from("jobs")
-      .update({
-        status,
-        passed,
-        proof_url,
-        checks,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("job_id", job_id)
+      .upsert(row, { onConflict: "job_id" })
       .select()
       .single();
 
-    if (error || !data) {
+    if (error) {
       return new Response(
-        JSON.stringify({ error: "Job not found", details: error?.message }),
+        JSON.stringify({ error: "Upsert failed", details: error.message }),
         {
-          status: 404,
+          status: error.message.includes("user_id") ? 400 : 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );

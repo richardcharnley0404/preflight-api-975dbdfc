@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       jobs: {
         Row: {
+          callback_url: string | null
           checks: Json | null
           completed_at: string | null
           filename: string | null
@@ -28,6 +29,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          callback_url?: string | null
           checks?: Json | null
           completed_at?: string | null
           filename?: string | null
@@ -40,6 +42,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          callback_url?: string | null
           checks?: Json | null
           completed_at?: string | null
           filename?: string | null

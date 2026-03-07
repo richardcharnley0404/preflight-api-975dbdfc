@@ -59,8 +59,7 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link to="/signup" className="text-primary hover:underline">Sign up</Link>
+              <Link to="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
             </p>
           </CardFooter>
         </form>

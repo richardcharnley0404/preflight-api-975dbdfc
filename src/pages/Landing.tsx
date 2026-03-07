@@ -56,9 +56,8 @@ export default function Landing() {
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
             <Link to="/dashboard/docs" className="hover:text-foreground transition-colors">API Documentation</Link>
             <a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a>
-            <Link to="/login" className="hover:text-foreground transition-colors">Log in</Link>
             <Button asChild size="sm">
-              <Link to="/signup">Sign Up Free</Link>
+              <Link to="/login">Log In</Link>
             </Button>
           </nav>
         </div>
@@ -77,16 +76,7 @@ export default function Landing() {
           Catch print errors before they cost you. PrintPreflight checks fonts, colors, resolution, bleed, and more — all through a simple REST API.
         </p>
         <div className="mt-10 flex items-center justify-center gap-4">
-          <Button asChild size="lg" className="gap-2">
-            <Link to="/signup">
-              Start Free <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href="https://docs.printpreflight.com" target="_blank" rel="noopener noreferrer">
-              View Docs
-            </a>
-          </Button>
+          <Badge variant="outline" className="px-4 py-2 text-sm">Alpha — Invite Only</Badge>
         </div>
       </section>
 
@@ -149,11 +139,11 @@ export default function Landing() {
               </CardContent>
               <CardFooter>
                 <Button
-                  asChild
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
+                  disabled
                 >
-                  <Link to="/signup">{plan.cta}</Link>
+                  Coming Soon
                 </Button>
               </CardFooter>
             </Card>

@@ -30,7 +30,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { job_id, status, passed, proof_url, checks, user_id, filename } = await req.json();
+    const payload = await req.json();
+    const { job_id, status, passed, proof_url, checks, user_id, filename } = payload;
 
     if (!job_id) {
       return new Response(JSON.stringify({ error: "Missing job_id" }), {
@@ -71,6 +72,29 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    // If this job has a callback_url, forward the results to the caller
+    if (data?.callback_url) {
+      try {
+        await fetch(data.callback_url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: status === "completed" ? "job.completed" : "job.failed",
+            job_id,
+            status,
+            passed,
+            checks,
+            proof_url,
+            filename,
+            completed_at: row.completed_at,
+          }),
+        });
+      } catch (callbackErr) {
+        // Log but don't fail — the job was saved successfully
+        console.error("Failed to forward to callback_url:", callbackErr);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, id: data.id }), {

@@ -13,7 +13,6 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Only accept POST (submit job) and GET (list/get jobs)
   if (!["POST", "GET"].includes(req.method)) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -21,7 +20,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Pass through X-API-Key — Railway validates it
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) {
     return new Response(
@@ -39,15 +37,16 @@ Deno.serve(async (req) => {
     if (req.method === "POST") {
       const payload = await req.json();
 
-      // Only inject default webhook if caller didn't provide one
-      if (!payload.webhook?.url) {
-        const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
-        const supabaseUrl = Deno.env.get("SUPABASE_URL");
-        payload.webhook = {
-          url: `${supabaseUrl}/functions/v1/preflight-webhook`,
-          secret: webhookSecret || "",
-        };
-      }
+      // Capture caller's webhook URL before overwriting
+      const callerWebhookUrl = payload.webhook?.url || null;
+
+      // Always inject this app's webhook so Railway calls back here
+      const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      payload.webhook = {
+        url: `${supabaseUrl}/functions/v1/preflight-webhook`,
+        secret: webhookSecret || "",
+      };
 
       // Forward to Railway
       const res = await fetch(`${RAILWAY_API}/api/jobs`, {
@@ -60,6 +59,21 @@ Deno.serve(async (req) => {
       });
 
       const body = await res.json();
+
+      // If Railway accepted the job and the caller provided a webhook,
+      // store it in the jobs table so preflight-webhook can forward results
+      if (res.ok && callerWebhookUrl && body.job_id) {
+        const supabase = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+        await supabase
+          .from("jobs")
+          .upsert(
+            { job_id: body.job_id, callback_url: callerWebhookUrl, status: "queued" },
+            { onConflict: "job_id" }
+          );
+      }
 
       return new Response(JSON.stringify(body), {
         status: res.status,

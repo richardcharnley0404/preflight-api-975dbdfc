@@ -36,19 +36,25 @@ Deno.serve(async (req) => {
   try {
     if (req.method === "POST") {
       const payload = await req.json();
+      console.log("[api-jobs] POST received, payload keys:", Object.keys(payload));
 
       // Capture caller's webhook URL before overwriting
       const callerWebhookUrl = payload.webhook?.url || null;
+      console.log("[api-jobs] Caller webhook URL:", callerWebhookUrl);
 
       // Always inject this app's webhook so Railway calls back here
       const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const internalWebhookUrl = `${supabaseUrl}/functions/v1/preflight-webhook`;
+      console.log("[api-jobs] Injecting webhook URL:", internalWebhookUrl);
+
       payload.webhook = {
-        url: `${supabaseUrl}/functions/v1/preflight-webhook`,
+        url: internalWebhookUrl,
         secret: webhookSecret || "",
       };
 
       // Forward to Railway
+      console.log("[api-jobs] Forwarding to Railway:", `${RAILWAY_API}/api/jobs`);
       const res = await fetch(`${RAILWAY_API}/api/jobs`, {
         method: "POST",
         headers: {
@@ -59,6 +65,7 @@ Deno.serve(async (req) => {
       });
 
       const body = await res.json();
+      console.log("[api-jobs] Railway response status:", res.status, "body:", JSON.stringify(body));
 
       // If Railway accepted the job and the caller provided a webhook,
       // store it in the jobs table so preflight-webhook can forward results
@@ -67,12 +74,13 @@ Deno.serve(async (req) => {
           Deno.env.get("SUPABASE_URL")!,
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
         );
-        await supabase
+        const { error: upsertError } = await supabase
           .from("jobs")
           .upsert(
             { job_id: body.job_id, callback_url: callerWebhookUrl, status: "queued" },
             { onConflict: "job_id" }
           );
+        console.log("[api-jobs] Upsert result:", upsertError ? upsertError.message : "ok");
       }
 
       return new Response(JSON.stringify(body), {

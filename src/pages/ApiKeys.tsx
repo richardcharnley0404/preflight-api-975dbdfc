@@ -126,7 +126,14 @@ export default function ApiKeys() {
                 {keys?.map((k) => (
                   <TableRow key={k.id}>
                     <TableCell className="font-medium">{k.name}</TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">{k.prefix}••••</TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        {k.prefix}••••
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyKey(k.prefix)}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </span>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{format(new Date(k.created_at), "MMM d, yyyy")}</TableCell>
                     <TableCell className="text-muted-foreground">{k.last_used_at ? format(new Date(k.last_used_at), "MMM d, yyyy") : "Never"}</TableCell>
                     <TableCell>

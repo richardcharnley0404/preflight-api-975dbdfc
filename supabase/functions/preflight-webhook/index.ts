@@ -75,25 +75,30 @@ Deno.serve(async (req) => {
     }
 
     // If this job has a callback_url, forward the results to the caller
+    console.log("[preflight-webhook] callback_url on job row:", data?.callback_url ?? "NONE");
     if (data?.callback_url) {
+      const callbackPayload = {
+        event: status === "completed" ? "job.completed" : "job.failed",
+        job_id,
+        status,
+        passed,
+        checks,
+        proof_url,
+        filename,
+        completed_at: row.completed_at,
+      };
+      console.log("[preflight-webhook] Forwarding to callback_url:", data.callback_url);
+      console.log("[preflight-webhook] Callback payload:", JSON.stringify(callbackPayload));
       try {
-        await fetch(data.callback_url, {
+        const cbRes = await fetch(data.callback_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            event: status === "completed" ? "job.completed" : "job.failed",
-            job_id,
-            status,
-            passed,
-            checks,
-            proof_url,
-            filename,
-            completed_at: row.completed_at,
-          }),
+          body: JSON.stringify(callbackPayload),
         });
+        console.log("[preflight-webhook] Callback response status:", cbRes.status);
       } catch (callbackErr) {
         // Log but don't fail — the job was saved successfully
-        console.error("Failed to forward to callback_url:", callbackErr);
+        console.error("[preflight-webhook] Failed to forward to callback_url:", callbackErr);
       }
     }
 

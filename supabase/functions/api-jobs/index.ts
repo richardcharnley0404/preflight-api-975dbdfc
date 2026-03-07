@@ -39,13 +39,15 @@ Deno.serve(async (req) => {
     if (req.method === "POST") {
       const payload = await req.json();
 
-      // Inject webhook config server-side so callers don't need to know about it
-      const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      payload.webhook = {
-        url: `${supabaseUrl}/functions/v1/preflight-webhook`,
-        secret: webhookSecret || "",
-      };
+      // Only inject default webhook if caller didn't provide one
+      if (!payload.webhook?.url) {
+        const webhookSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        payload.webhook = {
+          url: `${supabaseUrl}/functions/v1/preflight-webhook`,
+          secret: webhookSecret || "",
+        };
+      }
 
       // Forward to Railway
       const res = await fetch(`${RAILWAY_API}/api/jobs`, {

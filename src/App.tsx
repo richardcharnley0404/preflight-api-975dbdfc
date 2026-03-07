@@ -34,6 +34,7 @@ const App = () => (
             <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/docs" element={<ApiDocs />} />
             <Route path="/dashboard" element={<DashboardLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="api-keys" element={<ApiKeys />} />

@@ -8,6 +8,17 @@ const corsHeaders = {
 
 const RAILWAY_API = "https://preflight-api-production.up.railway.app";
 
+function resolveRailwayPath(rawPath: string | null, fallbackPath: string): string {
+  const candidate = rawPath?.trim() ? rawPath.trim() : fallbackPath;
+  const ensuredLeadingSlash = candidate.startsWith("/") ? candidate : `/${candidate}`;
+
+  if (ensuredLeadingSlash === "/api/jobs" || ensuredLeadingSlash.startsWith("/api/jobs/")) {
+    return ensuredLeadingSlash.replace("/api/jobs", "/v1/jobs");
+  }
+
+  return ensuredLeadingSlash;
+}
+
 function normalizeApiKey(value: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -78,8 +89,10 @@ Deno.serve(async (req) => {
       };
 
       // Forward to Railway
-      console.log("[api-jobs] Forwarding to Railway:", `${RAILWAY_API}/api/jobs`);
-      const res = await fetch(`${RAILWAY_API}/api/jobs`, {
+      const railwayPath = resolveRailwayPath(url.searchParams.get("path"), "/v1/jobs");
+      console.log("[api-jobs] Railway target path:", railwayPath);
+      console.log("[api-jobs] Forwarding to Railway:", `${RAILWAY_API}${railwayPath}`);
+      const res = await fetch(`${RAILWAY_API}${railwayPath}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -115,8 +128,10 @@ Deno.serve(async (req) => {
     }
 
     // GET — forward query params to Railway for list/detail
-    const path = url.searchParams.get("path") || "/api/jobs";
-    const res = await fetch(`${RAILWAY_API}${path}`, {
+    const railwayPath = resolveRailwayPath(url.searchParams.get("path"), "/v1/jobs");
+    console.log("[api-jobs] Railway target path:", railwayPath);
+
+    const res = await fetch(`${RAILWAY_API}${railwayPath}`, {
       method: "GET",
       headers: {
         "X-API-Key": apiKey,

@@ -1,29 +1,45 @@
 
-# Add Proof Viewer Option to Submit Job & Job Detail
 
-## What changes
+# Add API Documentation Page + OpenAPI JSON Spec
 
-### 1. Submit Job form (`src/pages/SubmitJob.tsx`)
-- Move the "Generate proof" toggle **out of the collapsible** section so it's always visible -- it's an important user-facing option, not an advanced setting
-- Change the default `proof_expires_hours` from `24` to `72`
-- When proof is enabled, show the expiry hours input inline; when disabled, hide it
-- Update `buildPayload` so when `proof_generate` is false, send `generate: false` (already works)
+## Summary
 
-### 2. Job Detail page (`src/pages/JobDetail.tsx`)
-- Replace the current "View Proof" text link with a styled `Button` component that opens in a new tab
-- Add an `ExternalLink` icon to make it clear it opens externally
+Create an interactive API documentation page in the dashboard and serve a machine-readable OpenAPI 3.1 JSON spec at `/api-docs.json`.
 
-### 3. Default values update
-- Change `DEFAULTS.proof_expires_hours` from `24` to `72`
+## Changes
 
-## Technical details
+### 1. Create `public/api-docs.json` -- OpenAPI 3.1 Specification
 
-**`src/pages/SubmitJob.tsx`**:
-- Remove the `Collapsible` wrapper around the Proof Settings card
-- Replace with a simple Card containing a Switch for "Generate proof viewer" and a conditionally-shown expiry hours input
-- Update `DEFAULTS.proof_expires_hours` to `72`
-- `buildPayload` already maps `proof_generate` and `proof_expires_hours` correctly -- no change needed there
+A complete OpenAPI spec covering all Preflight API endpoints that external source applications use:
 
-**`src/pages/JobDetail.tsx`**:
-- Replace the `<a>` tag on line 212 with a `<Button asChild>` wrapping an `<a>` tag, using `variant="outline"` and `size="sm"` with an `ExternalLink` icon
-- Import `ExternalLink` from lucide-react
+- **Authentication**: `X-API-Key` header
+- **POST /v1/jobs** -- Submit a preflight job (artwork URL, spec, webhook, proof config)
+- **GET /v1/jobs/{job_id}** -- Get job status and results
+- **GET /v1/jobs** -- List jobs with pagination/filtering
+- **Webhook callback schema** -- What gets POSTed to the customer's webhook URL
+- **Response schemas** for job results, checks, proof links
+
+Base URL placeholder: `https://api.preflight-api.com`
+
+### 2. Create `src/pages/ApiDocs.tsx` -- Dashboard Documentation Page
+
+A well-structured docs page with sections:
+
+- **Quick Start** -- 3-step guide (get API key, submit job, get results)
+- **Authentication** -- Show `X-API-Key` header usage with code snippet
+- **Submit a Job** -- Full `POST /v1/jobs` request/response example with all spec fields explained
+- **Get Job Result** -- `GET /v1/jobs/{job_id}` with response example showing checks array and proof URL
+- **Webhooks** -- How to configure webhook URL/secret, example payload
+- **Proof Viewer** -- How proof links work, custom `base_url` option
+- **Error Codes** -- Common HTTP status codes and meanings
+
+Use existing Card components, code blocks with copy-to-clipboard, and tabbed sections for curl/JS examples.
+
+### 3. Update `src/App.tsx` -- Add route
+
+Add `/dashboard/docs` route inside the dashboard layout.
+
+### 4. Update `src/components/AppSidebar.tsx` -- Add nav item
+
+Add "API Docs" link with `BookOpen` icon to the sidebar navigation, between "Job History" and "Billing".
+

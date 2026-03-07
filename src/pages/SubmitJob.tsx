@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronDown, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Upload, Loader2, BookOpen, FileText } from "lucide-react";
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,11 +24,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSubmitJob, type SubmitJobPayload } from "@/hooks/useApiData";
 
 // ─── Schema ───
 
 const pageSchema = z.object({
+  label: z.string().optional(),
   type: z.enum(["combined", "front", "back"]),
   range: z.string().min(1, "Required"),
   trim: z.object({
@@ -68,7 +76,37 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// ─── Preset page specs ───
+
+const COVER_PAGE = {
+  label: "Cover",
+  type: "combined" as const,
+  range: "1",
+  trim: { width: 425, height: 297 },
+  bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+  safe_zone: { left: 10, right: 10, top: 10, bottom: 10 },
+};
+
+const TEXT_PAGE = {
+  label: "Text Pages",
+  type: "combined" as const,
+  range: "2-end",
+  trim: { width: 210, height: 297 },
+  bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+  safe_zone: { left: 5, right: 5, top: 5, bottom: 5 },
+};
+
 const DEFAULT_PAGE = {
+  label: "",
+  type: "combined" as const,
+  range: "all",
+  trim: { width: 210, height: 297 },
+  bleed: { left: 3, right: 3, top: 3, bottom: 3 },
+  safe_zone: { left: 5, right: 5, top: 5, bottom: 5 },
+};
+
+const SADDLE_STITCHED_PAGE = {
+  label: "All Pages",
   type: "combined" as const,
   range: "all",
   trim: { width: 210, height: 297 },
@@ -100,7 +138,7 @@ function buildPayload(v: FormValues): SubmitJobPayload {
     artwork: { url: v.artwork_url, filename: v.artwork_filename },
     spec: {
       units: v.units,
-      pages: v.pages as SubmitJobPayload["spec"]["pages"],
+      pages: v.pages.map(({ label, ...rest }) => rest) as SubmitJobPayload["spec"]["pages"],
       page_count: {
         min: v.page_count_min,
         max: v.page_count_max,
@@ -113,9 +151,12 @@ function buildPayload(v: FormValues): SubmitJobPayload {
     },
   };
   if (v.job_id) payload.job_id = v.job_id;
-  // webhook is injected server-side by the submit-job edge function
   payload.proof = { generate: v.proof_generate, expires_hours: v.proof_expires_hours || 24 };
   return payload;
+}
+
+function trimSummary(trim: { width?: number; height?: number }, units: string) {
+  return `${trim.width ?? 0}×${trim.height ?? 0}${units}`;
 }
 
 // ─── Component ───
@@ -126,6 +167,7 @@ export default function SubmitJob() {
 
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [openSpecs, setOpenSpecs] = useState<Record<number, boolean>>({0: true});
 
   const {
     register,
@@ -165,14 +207,41 @@ export default function SubmitJob() {
     }
   };
 
-  const { fields, append, remove } = useFieldArray({ control, name: "pages" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "pages" });
+
+  const units = watch("units");
+
+  const applyPreset = (preset: "perfect-bound" | "saddle-stitched") => {
+    if (preset === "perfect-bound") {
+      replace([COVER_PAGE, TEXT_PAGE]);
+      setOpenSpecs({ 0: true, 1: true });
+    } else {
+      replace([SADDLE_STITCHED_PAGE]);
+      setOpenSpecs({ 0: true });
+    }
+  };
+
+  const addSpec = (type: "cover" | "text" | "custom") => {
+    const newIndex = fields.length;
+    if (type === "cover") {
+      append({ ...COVER_PAGE });
+    } else if (type === "text") {
+      append({ ...TEXT_PAGE, range: `${fields.length + 1}-end` });
+    } else {
+      append({ ...DEFAULT_PAGE });
+    }
+    setOpenSpecs(prev => ({ ...prev, [newIndex]: true }));
+  };
+
+  const toggleSpec = (index: number) => {
+    setOpenSpecs(prev => ({ ...prev, [index]: !prev[index] }));
+  };
 
   const onSubmit = async (values: FormValues) => {
     try {
       const payload = buildPayload(values);
       const result = await submitJob.mutateAsync(payload);
 
-      // Insert job row into Supabase so webhook can update it later
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -210,7 +279,6 @@ export default function SubmitJob() {
             <CardTitle className="text-sm font-medium">Artwork</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Upload PDF */}
             <div className="space-y-2">
               <Label>Upload PDF</Label>
               <div className="flex items-center gap-3">
@@ -260,7 +328,6 @@ export default function SubmitJob() {
             </div>
           </CardContent>
         </Card>
-
 
         {/* Proof */}
         <Card>
@@ -369,92 +436,166 @@ export default function SubmitJob() {
         {/* Pages */}
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium">Pages</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append(DEFAULT_PAGE)}
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add Page
-            </Button>
+            <div>
+              <CardTitle className="text-sm font-medium">Page Specifications</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Define different specs per page range — e.g. cover vs text pages
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    <BookOpen className="h-4 w-4 mr-1" /> Presets <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => applyPreset("perfect-bound")}>
+                    Perfect Bound Book (A4)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => applyPreset("saddle-stitched")}>
+                    Saddle-Stitched Booklet (A4)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-1" /> Add <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => addSpec("cover")}>
+                    Cover Spec
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addSpec("text")}>
+                    Text Pages Spec
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => addSpec("custom")}>
+                    Custom
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {errors.pages?.root && (
               <p className="text-sm text-destructive">{errors.pages.root.message}</p>
             )}
-            {fields.map((field, i) => (
-              <div key={field.id} className="rounded-lg border p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Page {i + 1}</span>
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => remove(i)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+            {fields.map((field, i) => {
+              const isOpen = openSpecs[i] ?? false;
+              const currentTrim = watch(`pages.${i}.trim`);
+              const currentLabel = watch(`pages.${i}.label`);
+              const currentRange = watch(`pages.${i}.range`);
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Type</Label>
-                    <Select
-                      value={watch(`pages.${i}.type`)}
-                      onValueChange={(v) =>
-                        setValue(`pages.${i}.type`, v as "combined" | "front" | "back")
-                      }
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="combined">Combined</SelectItem>
-                        <SelectItem value="front">Front</SelectItem>
-                        <SelectItem value="back">Back</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Range</Label>
-                    <Input {...register(`pages.${i}.range`)} placeholder='e.g. "all" or "1-4"' />
-                  </div>
-                </div>
+              return (
+                <Collapsible key={field.id} open={isOpen} onOpenChange={() => toggleSpec(i)}>
+                  <div className="rounded-lg border">
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <span className="text-sm font-medium">
+                              {currentLabel || `Spec ${i + 1}`}
+                            </span>
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {trimSummary(currentTrim, units)} · range: {currentRange}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {fields.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                remove(i);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
 
-                {/* Trim */}
-                <div>
-                  <Label className="text-xs text-muted-foreground">Trim</Label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    <Input type="number" step="0.1" placeholder="Width" {...register(`pages.${i}.trim.width`)} />
-                    <Input type="number" step="0.1" placeholder="Height" {...register(`pages.${i}.trim.height`)} />
-                  </div>
-                </div>
+                    <CollapsibleContent>
+                      <div className="px-4 pb-4 space-y-4 border-t pt-4">
+                        {/* Label */}
+                        <div className="space-y-2">
+                          <Label className="text-xs">Label (optional)</Label>
+                          <Input
+                            {...register(`pages.${i}.label`)}
+                            placeholder='e.g. "Cover", "Text Pages"'
+                          />
+                        </div>
 
-                {/* Bleed */}
-                <div>
-                  <Label className="text-xs text-muted-foreground">Bleed</Label>
-                  <div className="grid grid-cols-4 gap-2 mt-1">
-                    <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.bleed.left`)} />
-                    <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.bleed.right`)} />
-                    <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.bleed.top`)} />
-                    <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.bleed.bottom`)} />
-                  </div>
-                </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Type</Label>
+                            <Select
+                              value={watch(`pages.${i}.type`)}
+                              onValueChange={(v) =>
+                                setValue(`pages.${i}.type`, v as "combined" | "front" | "back")
+                              }
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="combined">Combined</SelectItem>
+                                <SelectItem value="front">Front</SelectItem>
+                                <SelectItem value="back">Back</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Range</Label>
+                            <Input {...register(`pages.${i}.range`)} placeholder='e.g. "all" or "1-4"' />
+                          </div>
+                        </div>
 
-                {/* Safe Zone */}
-                <div>
-                  <Label className="text-xs text-muted-foreground">Safe Zone</Label>
-                  <div className="grid grid-cols-4 gap-2 mt-1">
-                    <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.safe_zone.left`)} />
-                    <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.safe_zone.right`)} />
-                    <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.safe_zone.top`)} />
-                    <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.safe_zone.bottom`)} />
+                        {/* Trim */}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Trim</Label>
+                          <div className="grid grid-cols-2 gap-3 mt-1">
+                            <Input type="number" step="0.1" placeholder="Width" {...register(`pages.${i}.trim.width`)} />
+                            <Input type="number" step="0.1" placeholder="Height" {...register(`pages.${i}.trim.height`)} />
+                          </div>
+                        </div>
+
+                        {/* Bleed */}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Bleed</Label>
+                          <div className="grid grid-cols-4 gap-2 mt-1">
+                            <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.bleed.left`)} />
+                            <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.bleed.right`)} />
+                            <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.bleed.top`)} />
+                            <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.bleed.bottom`)} />
+                          </div>
+                        </div>
+
+                        {/* Safe Zone */}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Safe Zone</Label>
+                          <div className="grid grid-cols-4 gap-2 mt-1">
+                            <Input type="number" step="0.1" placeholder="L" {...register(`pages.${i}.safe_zone.left`)} />
+                            <Input type="number" step="0.1" placeholder="R" {...register(`pages.${i}.safe_zone.right`)} />
+                            <Input type="number" step="0.1" placeholder="T" {...register(`pages.${i}.safe_zone.top`)} />
+                            <Input type="number" step="0.1" placeholder="B" {...register(`pages.${i}.safe_zone.bottom`)} />
+                          </div>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                </div>
-              </div>
-            ))}
+                </Collapsible>
+              );
+            })}
           </CardContent>
         </Card>
 

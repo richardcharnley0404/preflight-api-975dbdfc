@@ -105,19 +105,43 @@ Deno.serve(async (req) => {
       const body = await res.json();
       console.log("[api-jobs] Railway response status:", res.status, "body:", JSON.stringify(body));
 
-      // If Railway accepted the job and the caller provided a webhook,
-      // store it in the jobs table so preflight-webhook can forward results
-      if (res.ok && callerWebhookUrl && body.job_id) {
+      // Look up the user_id from the API key prefix
+      if (res.ok && body.job_id) {
         const supabase = createClient(
           Deno.env.get("SUPABASE_URL")!,
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
         );
+
+        // Resolve user_id from api_keys table using the key prefix
+        let resolvedUserId: string | null = null;
+        if (apiKey) {
+          // Try matching prefix (first 8 chars of the key)
+          const keyPrefix = apiKey.slice(0, 8);
+          const { data: keyRow } = await supabase
+            .from("api_keys")
+            .select("user_id")
+            .like("prefix", `${keyPrefix}%`)
+            .is("revoked_at", null)
+            .limit(1)
+            .maybeSingle();
+          if (keyRow?.user_id) {
+            resolvedUserId = keyRow.user_id;
+            console.log("[api-jobs] Resolved user_id from API key prefix:", resolvedUserId);
+          } else {
+            console.log("[api-jobs] No user_id found for key prefix:", keyPrefix);
+          }
+        }
+
+        const upsertRow: Record<string, unknown> = {
+          job_id: body.job_id,
+          status: "queued",
+        };
+        if (callerWebhookUrl) upsertRow.callback_url = callerWebhookUrl;
+        if (resolvedUserId) upsertRow.user_id = resolvedUserId;
+
         const { error: upsertError } = await supabase
           .from("jobs")
-          .upsert(
-            { job_id: body.job_id, callback_url: callerWebhookUrl, status: "queued" },
-            { onConflict: "job_id" }
-          );
+          .upsert(upsertRow, { onConflict: "job_id" });
         console.log("[api-jobs] Upsert result:", upsertError ? upsertError.message : "ok");
       }
 

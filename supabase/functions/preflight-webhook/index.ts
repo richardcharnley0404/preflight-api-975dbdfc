@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         status,
         passed,
         checks,
-        proof_url,
+        proof_url: proxiedProofUrl,
         filename,
         completed_at: row.completed_at,
       };

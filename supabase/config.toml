@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.api-jobs]
 verify_jwt = false
+
+[functions.proof-proxy]
+verify_jwt = false

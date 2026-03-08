@@ -46,11 +46,22 @@ Deno.serve(async (req) => {
     );
 
     // Build the upsert row — only include user_id/filename if provided
+    // Rewrite proof_url to use our proof-proxy so callers see a clean URL
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    let proxiedProofUrl = proof_url;
+    if (proof_url) {
+      // Extract token from Railway URL like .../v1/proof/TOKEN
+      const match = proof_url.match(/\/v1\/proof\/(.+)$/);
+      if (match) {
+        proxiedProofUrl = `${supabaseUrl}/functions/v1/proof-proxy?token=${match[1]}`;
+      }
+    }
+
     const row: Record<string, unknown> = {
       job_id,
       status,
       passed,
-      proof_url,
+      proof_url: proxiedProofUrl,
       checks,
       completed_at: new Date().toISOString(),
     };

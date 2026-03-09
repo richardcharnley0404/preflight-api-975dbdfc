@@ -266,8 +266,12 @@
             }
           },
           "404": { "description": "Job not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
-        }
       }
     }
+  },
+  "x-proof-whitelabel": {
+    "title": "White-Label Proof URLs",
+    "description": "By default, proof URLs point to the PrintPreflight proxy. To serve proofs under your own domain, create a page on your site that embeds the proof_url from the webhook callback in an iframe.\n\n### Step 1 — Create a proof page on your domain\n\nAdd a route (e.g. `/proof/:token`) that renders a full-screen iframe:\n\n```html\n<iframe\n  src=\"{proof_url_from_callback}\"\n  style=\"width:100%; height:100vh; border:none;\"\n  title=\"Artwork Proof\"\n/>\n```\n\n### Step 2 — Handle the webhook callback\n\nWhen your webhook receives a `job.completed` event, extract `proof_url` from the payload. This URL is already proxied and CORS-enabled. Build your customer-facing link by combining your domain with the token:\n\n```\nhttps://yourdomain.com/proof/{token}\n```\n\n### Step 3 (Optional) — Set base_url in job submission\n\nInclude `proof.base_url` when submitting a job to have the API construct proof links using your domain automatically:\n\n```json\n{\n  \"proof\": {\n    \"generate\": true,\n    \"base_url\": \"https://yourdomain.com/proof\"\n  }\n}\n```\n\n### Example: React/Next.js proof page\n\n```tsx\nimport { useParams } from 'react-router-dom';\n\nexport default function ProofPage() {\n  const { token } = useParams();\n  const proofSrc = `https://bjchkbkfkpmsuqvuxlwp.supabase.co/functions/v1/proof-proxy?token=${token}`;\n  return <iframe src={proofSrc} className=\"w-full h-screen border-0\" title=\"Artwork Proof\" />;\n}\n```\n\nThis way, your customers see `https://yourdomain.com/proof/abc123` instead of a third-party URL."
   }
+}
 }

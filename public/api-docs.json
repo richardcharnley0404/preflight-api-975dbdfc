@@ -87,10 +87,11 @@
           },
           "proof": {
             "type": "object",
+            "description": "Controls visual proof generation. When enabled, a proof image is generated and a URL is returned in the webhook callback and job response. To serve proofs under your own domain, embed the returned proof_url in an iframe on your site (see x-proof-whitelabel).",
             "properties": {
-              "generate": { "type": "boolean", "default": true },
-              "expires_hours": { "type": "integer", "default": 72 },
-              "base_url": { "type": "string", "description": "Custom base URL for proof viewer links" }
+              "generate": { "type": "boolean", "default": true, "description": "Whether to generate a visual proof image for this job." },
+              "expires_hours": { "type": "integer", "default": 72, "description": "How many hours the proof link remains valid." },
+              "base_url": { "type": "string", "description": "Custom base URL for proof viewer links. If provided, the proof_url in callbacks will be constructed using this base URL instead of the default." }
             }
           },
           "spec": {

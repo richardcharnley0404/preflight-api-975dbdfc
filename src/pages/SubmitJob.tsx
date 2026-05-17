@@ -309,6 +309,37 @@ export default function SubmitJob() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Quick start preset */}
+        {presetsData?.presets && presetsData.presets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Quick start with a preset</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Select
+                onValueChange={(id) => {
+                  const p = presetsData.presets.find((x) => x.id === id);
+                  if (p) applyApiPreset(p);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a print product…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presetsData.presets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} — {p.description.split(".")[0]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Picking a preset fills in the form below. You can still edit any field afterwards.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Artwork */}
         <Card>
           <CardHeader>

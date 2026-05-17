@@ -5,7 +5,30 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronDown, Upload, Loader2, BookOpen, FileText } from "lucide-react";
 import { useState, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+
+interface PresetEntry {
+  id: string;
+  name: string;
+  description: string;
+  spec: {
+    units: "mm" | "inches";
+    pages: Array<{
+      type: "combined" | "front" | "back";
+      range: string;
+      trim: { width: number; height: number };
+      bleed: { left: number; right: number; top: number; bottom: number };
+      safe_zone: { left: number; right: number; top: number; bottom: number };
+    }>;
+    page_count?: { min?: number; max?: number; must_be_even?: boolean };
+    min_dpi?: number;
+    colour_space?: "any" | "cmyk" | "rgb";
+    font_check?: boolean;
+    dimension_tolerance_mm?: number;
+  };
+}
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,6 +204,27 @@ export default function SubmitJob() {
     defaultValues: DEFAULTS,
   });
 
+  const { data: presetsData } = useQuery({
+    queryKey: ["presets"],
+    queryFn: () => apiGet<{ presets: PresetEntry[] }>("/api/presets"),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  function applyApiPreset(p: PresetEntry) {
+    if (p.spec.units) setValue("units", p.spec.units);
+    if (p.spec.min_dpi) setValue("min_dpi", p.spec.min_dpi);
+    if (p.spec.colour_space) setValue("colour_space", p.spec.colour_space);
+    if (typeof p.spec.font_check === "boolean") setValue("font_check", p.spec.font_check);
+    if (p.spec.dimension_tolerance_mm) setValue("dimension_tolerance_mm", p.spec.dimension_tolerance_mm);
+    if (p.spec.page_count?.min) setValue("page_count_min", p.spec.page_count.min);
+    if (p.spec.page_count?.max) setValue("page_count_max", p.spec.page_count.max);
+    if (p.spec.page_count?.must_be_even !== undefined) {
+      setValue("page_count_must_be_even", p.spec.page_count.must_be_even);
+    }
+    setValue("pages", p.spec.pages.map((pg) => ({ ...pg, label: "" })));
+    toast.success(`Preset loaded: ${p.name}`);
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -265,6 +309,37 @@ export default function SubmitJob() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Quick start preset */}
+        {presetsData?.presets && presetsData.presets.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Quick start with a preset</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Select
+                onValueChange={(id) => {
+                  const p = presetsData.presets.find((x) => x.id === id);
+                  if (p) applyApiPreset(p);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a print product…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {presetsData.presets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} — {p.description.split(".")[0]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Picking a preset fills in the form below. You can still edit any field afterwards.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Artwork */}
         <Card>
           <CardHeader>

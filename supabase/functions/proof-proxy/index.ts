@@ -44,14 +44,13 @@ Deno.serve(async (req) => {
     const res = await fetch(railwayUrl);
 
     // Stream the response through, preserving content type
-    const contentType = res.headers.get("content-type") || "application/octet-stream";
     const body = await res.arrayBuffer();
 
     return new Response(body, {
       status: res.status,
       headers: {
         ...corsHeaders,
-        "Content-Type": contentType,
+        "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "public, max-age=3600",
       },
     });

@@ -55,6 +55,19 @@ export default function JobHistory() {
     },
   });
 
+  useEffect(() => {
+    const channel = supabase
+      .channel("jobs-history")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jobs" },
+        () => queryClient.invalidateQueries({ queryKey: ["jobs"] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
+
   const jobs = data?.jobs ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / perPage);

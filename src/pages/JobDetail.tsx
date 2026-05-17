@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, CheckCircle, XCircle, ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, ChevronDown, ExternalLink, Download, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { apiPost } from "@/lib/api";
+import { toast } from "sonner";
 import { format } from "date-fns";
 
-// ─── Types matching Railway's checks object ───
+// ─── Types ───
 
 interface CheckEntry {
   passed: boolean;
@@ -22,14 +24,47 @@ interface CheckEntry {
 
 type ChecksMap = Record<string, CheckEntry>;
 
+interface PageIssue {
+  check: string;
+  severity: "fail" | "warning";
+  message: string;
+  edge?: string;
+  bbox?: [number, number, number, number];
+}
+
+interface FixedArtwork {
+  url: string;
+  expires_at: string;
+  fixes_applied: { check: string; pages: number[] }[];
+}
+
+interface FullResults {
+  passed: boolean;
+  summary?: {
+    total_checks: number;
+    passed: number;
+    failed: number;
+    warnings: number;
+  };
+  checks?: ChecksMap;
+  page_issues?: Record<string, PageIssue[]>;
+  fixed_artwork?: FixedArtwork | null;
+  proof_url?: string | null;
+}
+
 const CHECK_ORDER = [
-  "dimensions",
   "page_count",
+  "dimensions",
   "bleed",
   "safe_zone",
   "resolution",
   "colour_space",
   "fonts",
+  "tac",
+  "spot_colours",
+  "pdf_x",
+  "hairline",
+  "overprint",
 ];
 
 function formatCheckName(key: string): string {
@@ -39,22 +74,33 @@ function formatCheckName(key: string): string {
     .join(" ");
 }
 
-function getCheckMessages(entry: CheckEntry): string[] {
-  const items = entry.details ?? entry.pages_failed ?? entry.warnings ?? [];
-  const msgs = items
+function getMessages(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  return items
     .map((i) => (typeof i === "object" && i !== null ? (i as { message?: string }).message : undefined))
     .filter(Boolean) as string[];
-  if (msgs.length === 0 && entry.message) msgs.push(entry.message);
-  return msgs;
 }
 
-// ─── Components ───
+// ─── Check row ───
 
 function CheckRow({ name, entry }: { name: string; entry: CheckEntry }) {
   const [open, setOpen] = useState(false);
-  const messages = entry.passed ? [] : getCheckMessages(entry);
-  const hasDetails = messages.length > 0;
-  const collapsed = messages.length > 3;
+  const failures = entry.passed ? [] : [...getMessages(entry.details), ...getMessages(entry.pages_failed)];
+  if (!entry.passed && failures.length === 0 && entry.message) failures.push(entry.message);
+  const warnings = getMessages(entry.warnings);
+  const all = [
+    ...failures.map((m) => ({ kind: "fail" as const, message: m })),
+    ...warnings.map((m) => ({ kind: "warn" as const, message: m })),
+  ];
+  const hasDetails = all.length > 0;
+  const collapsed = all.length > 3;
+
+  const renderItem = (item: { kind: "fail" | "warn"; message: string }, i: number) =>
+    item.kind === "warn" ? (
+      <li key={i} className="text-sm text-amber-600">⚠ {item.message}</li>
+    ) : (
+      <li key={i} className="text-sm text-muted-foreground">• {item.message}</li>
+    );
 
   return (
     <div className="flex items-start gap-3 p-3 rounded-md hover:bg-muted/50 transition-colors">
@@ -68,31 +114,19 @@ function CheckRow({ name, entry }: { name: string; entry: CheckEntry }) {
         {hasDetails && (
           collapsed ? (
             <Collapsible open={open} onOpenChange={setOpen}>
-              <ul className="mt-1 space-y-0.5">
-                {messages.slice(0, 3).map((m, i) => (
-                  <li key={i} className="text-sm text-muted-foreground">• {m}</li>
-                ))}
-              </ul>
+              <ul className="mt-1 space-y-0.5">{all.slice(0, 3).map(renderItem)}</ul>
               <CollapsibleContent>
-                <ul className="space-y-0.5">
-                  {messages.slice(3).map((m, i) => (
-                    <li key={i} className="text-sm text-muted-foreground">• {m}</li>
-                  ))}
-                </ul>
+                <ul className="space-y-0.5">{all.slice(3).map((it, i) => renderItem(it, i + 3))}</ul>
               </CollapsibleContent>
               <CollapsibleTrigger asChild>
                 <button className="text-xs text-primary mt-1 flex items-center gap-1 hover:underline">
-                  {open ? "Show less" : `Show ${messages.length - 3} more`}
+                  {open ? "Show less" : `Show ${all.length - 3} more`}
                   <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
                 </button>
               </CollapsibleTrigger>
             </Collapsible>
           ) : (
-            <ul className="mt-1 space-y-0.5">
-              {messages.map((m, i) => (
-                <li key={i} className="text-sm text-muted-foreground">• {m}</li>
-              ))}
-            </ul>
+            <ul className="mt-1 space-y-0.5">{all.map(renderItem)}</ul>
           )
         )}
       </div>
@@ -104,6 +138,7 @@ function CheckRow({ name, entry }: { name: string; entry: CheckEntry }) {
 
 export default function JobDetail() {
   const { jobId } = useParams();
+  const queryClient = useQueryClient();
 
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", jobId],
@@ -117,6 +152,28 @@ export default function JobDetail() {
       return data;
     },
     enabled: !!jobId,
+  });
+
+  useEffect(() => {
+    if (!jobId) return;
+    const channel = supabase
+      .channel(`job-${jobId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${jobId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["job", jobId] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [jobId, queryClient]);
+
+  const retryMutation = useMutation({
+    mutationFn: () => apiPost(`/api/jobs/${jobId}/retry`),
+    onSuccess: () => {
+      toast.success("Retry queued");
+      queryClient.invalidateQueries({ queryKey: ["job", jobId] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Retry failed"),
   });
 
   if (isLoading) {
@@ -144,10 +201,17 @@ export default function JobDetail() {
     );
   }
 
-  // Parse checks object
-  const rawChecks = (job.checks && typeof job.checks === "object" && !Array.isArray(job.checks))
-    ? (job.checks as unknown as ChecksMap)
-    : null;
+  const results: FullResults | null =
+    job.results && typeof job.results === "object" && !Array.isArray(job.results)
+      ? (job.results as unknown as FullResults)
+      : null;
+
+  const rawChecks: ChecksMap | null =
+    results?.checks && typeof results.checks === "object"
+      ? results.checks
+      : job.checks && typeof job.checks === "object" && !Array.isArray(job.checks)
+        ? (job.checks as unknown as ChecksMap)
+        : null;
 
   const orderedChecks: [string, CheckEntry][] = rawChecks
     ? (CHECK_ORDER
@@ -161,6 +225,14 @@ export default function JobDetail() {
     : [];
 
   const isPassed = job.passed === true;
+  const fixed = results?.fixed_artwork;
+  const summary = results?.summary;
+  const errorMessage = (job as unknown as { error_message?: string }).error_message;
+
+  const showRetry =
+    job.status === "failed" ||
+    (job.status === "completed" && job.webhook_delivered === false);
+  const retryLabel = job.status === "failed" ? "Retry job" : "Retry webhook";
 
   return (
     <div className="space-y-6">
@@ -172,6 +244,17 @@ export default function JobDetail() {
           <h1 className="text-2xl font-bold">{job.filename || "Untitled"}</h1>
           <p className="text-muted-foreground font-mono text-sm">{job.job_id || job.id}</p>
         </div>
+        {showRetry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => retryMutation.mutate()}
+            disabled={retryMutation.isPending}
+          >
+            <RotateCcw className="h-4 w-4 mr-1" />
+            {retryLabel}
+          </Button>
+        )}
         {job.status === "completed" || job.completed_at ? (
           isPassed ? (
             <Badge className="bg-success text-success-foreground text-base px-4 py-1">Pass</Badge>
@@ -184,6 +267,27 @@ export default function JobDetail() {
           </Badge>
         )}
       </div>
+
+      {/* Fixed artwork banner */}
+      {fixed?.url && (
+        <Card className="border-success/30 bg-success/5">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="text-base">A fixed version of your artwork is available</CardTitle>
+              {fixed.fixes_applied?.length > 0 && (
+                <CardDescription className="mt-2">
+                  Auto-fixed: {fixed.fixes_applied.map((f) => `${formatCheckName(f.check)} (pages ${f.pages.join(", ")})`).join("; ")}
+                </CardDescription>
+              )}
+            </div>
+            <Button asChild size="sm">
+              <a href={fixed.url} target="_blank" rel="noopener noreferrer">
+                <Download className="h-4 w-4 mr-1" /> Download
+              </a>
+            </Button>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Metadata */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -221,6 +325,30 @@ export default function JobDetail() {
         </Card>
       </div>
 
+      {/* Summary */}
+      {summary && (
+        <Card>
+          <CardContent className="pt-6 grid gap-4 grid-cols-2 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Checks run</p>
+              <p className="text-2xl font-semibold mt-1">{summary.total_checks}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Passed</p>
+              <p className="text-2xl font-semibold mt-1 text-success">{summary.passed}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Failed</p>
+              <p className="text-2xl font-semibold mt-1 text-destructive">{summary.failed}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Warnings</p>
+              <p className="text-2xl font-semibold mt-1 text-amber-600">{summary.warnings}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Checks Breakdown */}
       {orderedChecks.length > 0 && (
         <Card>
@@ -241,6 +369,18 @@ export default function JobDetail() {
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             Preflight checks will appear here once the job completes.
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error message */}
+      {job.status === "failed" && errorMessage && (
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader>
+            <CardTitle className="text-base text-destructive">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{errorMessage}</p>
           </CardContent>
         </Card>
       )}

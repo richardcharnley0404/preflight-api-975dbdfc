@@ -115,7 +115,7 @@ export interface PageSpec {
 
 export interface SubmitJobPayload {
   job_id?: string;
-  artwork: { url: string; filename: string };
+  artwork: Array<{ url: string; filename: string; role?: "cover" | "text" }>;
   webhook?: { url: string; secret: string };
   proof?: { generate: boolean; expires_hours: number };
   spec: {
@@ -126,6 +126,7 @@ export interface SubmitJobPayload {
     colour_space: "any" | "cmyk" | "rgb";
     font_check: boolean;
     dimension_tolerance_mm: number;
+    product?: { type: "single_page" | "leaflet_2pp" | "saddle_stitched" | "perfect_bound" | "case_bound" };
   };
 }
 

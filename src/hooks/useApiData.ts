@@ -154,7 +154,20 @@ export function useSubmitJob() {
           body: JSON.stringify(payload),
         }
       );
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        let detail: string | undefined;
+        try {
+          const body = await res.clone().json();
+          detail = typeof body?.detail === "string"
+            ? body.detail
+            : Array.isArray(body?.detail)
+              ? body.detail.map((e: { msg?: string; loc?: (string|number)[] }) =>
+                  e.loc?.length ? `${e.loc.join(".")}: ${e.msg}` : e.msg
+                ).filter(Boolean).join("; ")
+              : undefined;
+        } catch { /* not JSON */ }
+        throw new Error(detail || `API error: ${res.status}`);
+      }
       return res.json() as Promise<SubmitJobResponse>;
     },
     onSuccess: () => {

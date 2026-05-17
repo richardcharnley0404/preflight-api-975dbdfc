@@ -348,8 +348,8 @@ export default function SubmitJob() {
 
       toast.success("Job submitted successfully!");
       navigate(jobRow ? `/dashboard/jobs/${jobRow.id}` : "/dashboard/jobs");
-    } catch {
-      toast.error("Failed to submit job. Please try again.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit job. Please try again.");
     }
   };
 

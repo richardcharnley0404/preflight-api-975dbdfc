@@ -766,7 +766,7 @@ export default function SubmitJob() {
 
         {/* Submit */}
         <div className="flex gap-3">
-          <Button type="submit" className="flex-1" disabled={submitJob.isPending}>
+          <Button type="submit" className="flex-1" disabled={submitJob.isPending || !canSubmit}>
             {submitJob.isPending ? "Submitting…" : "Submit Job"}
           </Button>
           <Button

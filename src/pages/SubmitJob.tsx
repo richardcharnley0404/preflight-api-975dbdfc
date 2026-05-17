@@ -204,6 +204,27 @@ export default function SubmitJob() {
     defaultValues: DEFAULTS,
   });
 
+  const { data: presetsData } = useQuery({
+    queryKey: ["presets"],
+    queryFn: () => apiGet<{ presets: PresetEntry[] }>("/api/presets"),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  function applyPreset(p: PresetEntry) {
+    if (p.spec.units) setValue("units", p.spec.units);
+    if (p.spec.min_dpi) setValue("min_dpi", p.spec.min_dpi);
+    if (p.spec.colour_space) setValue("colour_space", p.spec.colour_space);
+    if (typeof p.spec.font_check === "boolean") setValue("font_check", p.spec.font_check);
+    if (p.spec.dimension_tolerance_mm) setValue("dimension_tolerance_mm", p.spec.dimension_tolerance_mm);
+    if (p.spec.page_count?.min) setValue("page_count_min", p.spec.page_count.min);
+    if (p.spec.page_count?.max) setValue("page_count_max", p.spec.page_count.max);
+    if (p.spec.page_count?.must_be_even !== undefined) {
+      setValue("page_count_must_be_even", p.spec.page_count.must_be_even);
+    }
+    setValue("pages", p.spec.pages.map((pg) => ({ ...pg, label: "" })));
+    toast.success(`Preset loaded: ${p.name}`);
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

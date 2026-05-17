@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -26,6 +26,7 @@ export default function JobHistory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const perPage = 10;
 
   const { data, isLoading } = useQuery({
@@ -53,6 +54,19 @@ export default function JobHistory() {
       return { jobs: jobs ?? [], total: count ?? 0 };
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("jobs-history")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jobs" },
+        () => queryClient.invalidateQueries({ queryKey: ["jobs"] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
+
 
   const jobs = data?.jobs ?? [];
   const total = data?.total ?? 0;

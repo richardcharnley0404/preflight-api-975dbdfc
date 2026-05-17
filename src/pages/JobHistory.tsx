@@ -26,6 +26,7 @@ export default function JobHistory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const perPage = 10;
 
   const { data, isLoading } = useQuery({

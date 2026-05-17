@@ -392,56 +392,102 @@ export default function SubmitJob() {
           </Card>
         )}
 
+        {/* Product type */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Product type</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Select
+              value={productType}
+              onValueChange={(v) => setProductType(v as ProductType)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="single_page">Single page (postcard, business card)</SelectItem>
+                <SelectItem value="leaflet_2pp">Leaflet (front + back)</SelectItem>
+                <SelectItem value="saddle_stitched">Saddle-stitched booklet</SelectItem>
+                <SelectItem value="perfect_bound">Perfect bound book</SelectItem>
+                <SelectItem value="case_bound">Case bound (hardback)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Determines how multiple files are assembled into reader order.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Artwork */}
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Artwork</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Upload PDF</Label>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
-                  ) : (
-                    <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
-                  )}
-                </Button>
-                <span className="text-xs text-muted-foreground">or enter a URL below</span>
-              </div>
-            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Job ID (optional)</Label>
                 <Input {...register("job_id")} placeholder="e.g. test-002" />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+            {hasSeparateCover && (
               <div className="space-y-2">
-                <Label>Artwork URL *</Label>
-                <Input {...register("artwork_url")} placeholder="https://..." />
-                {errors.artwork_url && (
-                  <p className="text-sm text-destructive">{errors.artwork_url.message}</p>
-                )}
+                <Label>Cover file *</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, "cover")}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={uploadingSlot !== null}
+                  >
+                    {uploadingSlot === "cover" ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><Upload className="h-4 w-4 mr-2" /> Choose cover PDF</>
+                    )}
+                  </Button>
+                  {coverFilename && (
+                    <span className="text-xs text-muted-foreground truncate">{coverFilename}</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cover should be 2 pages (front + back) or 4 pages (front, inside front, inside back, back).
+                  Required for binding to assemble correctly.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Filename *</Label>
-                <Input {...register("artwork_filename")} placeholder="file.pdf" />
-                {errors.artwork_filename && (
-                  <p className="text-sm text-destructive">{errors.artwork_filename.message}</p>
+            )}
+
+            <div className="space-y-2">
+              <Label>{hasSeparateCover ? "Text file *" : "Artwork *"}</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={textInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, "text")}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => textInputRef.current?.click()}
+                  disabled={uploadingSlot !== null}
+                >
+                  {uploadingSlot === "text" ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
+                  )}
+                </Button>
+                {textFilename && (
+                  <span className="text-xs text-muted-foreground truncate">{textFilename}</span>
                 )}
               </div>
             </div>

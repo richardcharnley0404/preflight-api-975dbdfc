@@ -5,7 +5,30 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronDown, Upload, Loader2, BookOpen, FileText } from "lucide-react";
 import { useState, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+
+interface PresetEntry {
+  id: string;
+  name: string;
+  description: string;
+  spec: {
+    units: "mm" | "inches";
+    pages: Array<{
+      type: "combined" | "front" | "back";
+      range: string;
+      trim: { width: number; height: number };
+      bleed: { left: number; right: number; top: number; bottom: number };
+      safe_zone: { left: number; right: number; top: number; bottom: number };
+    }>;
+    page_count?: { min?: number; max?: number; must_be_even?: boolean };
+    min_dpi?: number;
+    colour_space?: "any" | "cmyk" | "rgb";
+    font_check?: boolean;
+    dimension_tolerance_mm?: number;
+  };
+}
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

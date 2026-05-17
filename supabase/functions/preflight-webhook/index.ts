@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         checks,
         page_issues,
         fixed_artwork,
-        proof_url: proxiedProofUrl,
+        proof_url,
         filename,
         completed_at: row.completed_at,
       };

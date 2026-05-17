@@ -3,8 +3,31 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-webhook-signature",
 };
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+async function computeHmacSha256Hex(secret: string, body: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,11 +41,33 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Verify webhook secret
-  const secret = req.headers.get("x-webhook-secret");
   const expectedSecret = Deno.env.get("PREFLIGHT_WEBHOOK_SECRET");
+  if (!expectedSecret) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-  if (!expectedSecret || secret !== expectedSecret) {
+  // Read raw body once — required for HMAC verification before JSON parse
+  const rawBody = await req.text();
+
+  // Prefer HMAC signature; fall back to legacy shared-secret
+  const signatureHeader = req.headers.get("x-webhook-signature");
+  let authed = false;
+
+  if (signatureHeader) {
+    const match = signatureHeader.match(/^sha256=([a-f0-9]+)$/i);
+    if (match) {
+      const expectedHex = await computeHmacSha256Hex(expectedSecret, rawBody);
+      authed = timingSafeEqual(match[1].toLowerCase(), expectedHex.toLowerCase());
+    }
+  } else {
+    const sharedSecret = req.headers.get("x-webhook-secret");
+    authed = !!sharedSecret && timingSafeEqual(sharedSecret, expectedSecret);
+  }
+
+  if (!authed) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -30,8 +75,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const payload = await req.json();
-    const { job_id, status, passed, proof_url, checks, user_id, filename } = payload;
+    const payload = JSON.parse(rawBody);
+    const {
+      job_id,
+      status,
+      passed,
+      proof_url,
+      checks,
+      user_id,
+      filename,
+      summary,
+      page_issues,
+      fixed_artwork,
+    } = payload;
 
     if (!job_id) {
       return new Response(JSON.stringify({ error: "Missing job_id" }), {
@@ -45,17 +101,24 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Build the upsert row — only include user_id/filename if provided
     // Rewrite proof_url to use our proof-proxy so callers see a clean URL
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     let proxiedProofUrl = proof_url;
     if (proof_url) {
-      // Extract token from Railway URL like .../v1/proof/TOKEN
       const match = proof_url.match(/\/v1\/proof\/(.+)$/);
       if (match) {
         proxiedProofUrl = `${supabaseUrl}/functions/v1/proof-proxy?token=${match[1]}`;
       }
     }
+
+    const fullResults = {
+      passed,
+      summary,
+      checks,
+      page_issues,
+      fixed_artwork,
+      proof_url: proxiedProofUrl,
+    };
 
     const row: Record<string, unknown> = {
       job_id,
@@ -63,6 +126,7 @@ Deno.serve(async (req) => {
       passed,
       proof_url: proxiedProofUrl,
       checks,
+      results: fullResults,
       completed_at: new Date().toISOString(),
     };
 
@@ -85,7 +149,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If this job has a callback_url, forward the results to the caller
+    // Forward to caller's callback_url if present, and track delivery
     console.log("[preflight-webhook] callback_url on job row:", data?.callback_url ?? "NONE");
     if (data?.callback_url) {
       const callbackPayload = {
@@ -93,23 +157,34 @@ Deno.serve(async (req) => {
         job_id,
         status,
         passed,
+        summary,
         checks,
+        page_issues,
+        fixed_artwork,
         proof_url: proxiedProofUrl,
         filename,
         completed_at: row.completed_at,
       };
       console.log("[preflight-webhook] Forwarding to callback_url:", data.callback_url);
-      console.log("[preflight-webhook] Callback payload:", JSON.stringify(callbackPayload));
+      let delivered = false;
       try {
         const cbRes = await fetch(data.callback_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(callbackPayload),
         });
+        delivered = cbRes.ok;
         console.log("[preflight-webhook] Callback response status:", cbRes.status);
       } catch (callbackErr) {
-        // Log but don't fail — the job was saved successfully
         console.error("[preflight-webhook] Failed to forward to callback_url:", callbackErr);
+      }
+
+      const { error: updateErr } = await supabase
+        .from("jobs")
+        .update({ webhook_delivered: delivered })
+        .eq("job_id", job_id);
+      if (updateErr) {
+        console.error("[preflight-webhook] Failed to update webhook_delivered:", updateErr.message);
       }
     }
 

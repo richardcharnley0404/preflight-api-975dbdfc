@@ -82,8 +82,6 @@ const pageSchema = z.object({
 
 const formSchema = z.object({
   job_id: z.string().optional(),
-  artwork_url: z.string().url("Must be a valid URL"),
-  artwork_filename: z.string().min(1, "Required"),
   proof_generate: z.boolean(),
   proof_expires_hours: z.coerce.number().int().positive().optional(),
   units: z.enum(["mm", "inches"]),
@@ -96,6 +94,8 @@ const formSchema = z.object({
   page_count_must_be_even: z.boolean(),
   pages: z.array(pageSchema).min(1, "At least one page spec is required"),
 });
+
+type ProductType = "single_page" | "leaflet_2pp" | "saddle_stitched" | "perfect_bound" | "case_bound";
 
 type FormValues = z.infer<typeof formSchema>;
 

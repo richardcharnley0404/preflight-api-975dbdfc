@@ -101,30 +101,20 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Rewrite proof_url to use our proof-proxy so callers see a clean URL
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    let proxiedProofUrl = proof_url;
-    if (proof_url) {
-      const match = proof_url.match(/\/v1\/proof\/(.+)$/);
-      if (match) {
-        proxiedProofUrl = `${supabaseUrl}/functions/v1/proof-proxy?token=${match[1]}`;
-      }
-    }
-
     const fullResults = {
       passed,
       summary,
       checks,
       page_issues,
       fixed_artwork,
-      proof_url: proxiedProofUrl,
+      proof_url,
     };
 
     const row: Record<string, unknown> = {
       job_id,
       status,
       passed,
-      proof_url: proxiedProofUrl,
+      proof_url,
       checks,
       results: fullResults,
       completed_at: new Date().toISOString(),

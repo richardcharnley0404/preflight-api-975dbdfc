@@ -139,8 +139,6 @@ const SADDLE_STITCHED_PAGE = {
 
 const DEFAULTS: FormValues = {
   job_id: "",
-  artwork_url: "",
-  artwork_filename: "",
   proof_generate: false,
   proof_expires_hours: 72,
   units: "mm",
@@ -156,9 +154,13 @@ const DEFAULTS: FormValues = {
 
 // ─── Helpers ───
 
-function buildPayload(v: FormValues): SubmitJobPayload {
+function buildPayload(
+  v: FormValues,
+  productType: ProductType,
+  artwork: SubmitJobPayload["artwork"],
+): SubmitJobPayload {
   const payload: SubmitJobPayload = {
-    artwork: { url: v.artwork_url, filename: v.artwork_filename },
+    artwork,
     spec: {
       units: v.units,
       pages: v.pages.map(({ label, ...rest }) => rest) as SubmitJobPayload["spec"]["pages"],
@@ -171,6 +173,7 @@ function buildPayload(v: FormValues): SubmitJobPayload {
       colour_space: v.colour_space,
       font_check: v.font_check,
       dimension_tolerance_mm: v.dimension_tolerance_mm,
+      product: { type: productType },
     },
   };
   if (v.job_id) payload.job_id = v.job_id;

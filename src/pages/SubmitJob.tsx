@@ -82,8 +82,6 @@ const pageSchema = z.object({
 
 const formSchema = z.object({
   job_id: z.string().optional(),
-  artwork_url: z.string().url("Must be a valid URL"),
-  artwork_filename: z.string().min(1, "Required"),
   proof_generate: z.boolean(),
   proof_expires_hours: z.coerce.number().int().positive().optional(),
   units: z.enum(["mm", "inches"]),
@@ -96,6 +94,8 @@ const formSchema = z.object({
   page_count_must_be_even: z.boolean(),
   pages: z.array(pageSchema).min(1, "At least one page spec is required"),
 });
+
+type ProductType = "single_page" | "leaflet_2pp" | "saddle_stitched" | "perfect_bound" | "case_bound";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -139,8 +139,6 @@ const SADDLE_STITCHED_PAGE = {
 
 const DEFAULTS: FormValues = {
   job_id: "",
-  artwork_url: "",
-  artwork_filename: "",
   proof_generate: false,
   proof_expires_hours: 72,
   units: "mm",
@@ -156,9 +154,13 @@ const DEFAULTS: FormValues = {
 
 // ─── Helpers ───
 
-function buildPayload(v: FormValues): SubmitJobPayload {
+function buildPayload(
+  v: FormValues,
+  productType: ProductType,
+  artwork: SubmitJobPayload["artwork"],
+): SubmitJobPayload {
   const payload: SubmitJobPayload = {
-    artwork: { url: v.artwork_url, filename: v.artwork_filename },
+    artwork,
     spec: {
       units: v.units,
       pages: v.pages.map(({ label, ...rest }) => rest) as SubmitJobPayload["spec"]["pages"],
@@ -171,6 +173,7 @@ function buildPayload(v: FormValues): SubmitJobPayload {
       colour_space: v.colour_space,
       font_check: v.font_check,
       dimension_tolerance_mm: v.dimension_tolerance_mm,
+      product: { type: productType },
     },
   };
   if (v.job_id) payload.job_id = v.job_id;
@@ -188,9 +191,20 @@ export default function SubmitJob() {
   const navigate = useNavigate();
   const submitJob = useSubmitJob();
 
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [productType, setProductType] = useState<ProductType>("single_page");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [coverFilename, setCoverFilename] = useState("");
+  const [textUrl, setTextUrl] = useState("");
+  const [textFilename, setTextFilename] = useState("");
+  const [uploadingSlot, setUploadingSlot] = useState<"cover" | "text" | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const [openSpecs, setOpenSpecs] = useState<Record<number, boolean>>({0: true});
+
+  const hasSeparateCover =
+    productType === "saddle_stitched" ||
+    productType === "perfect_bound" ||
+    productType === "case_bound";
 
   const {
     register,
@@ -210,6 +224,14 @@ export default function SubmitJob() {
     staleTime: 60 * 60 * 1000,
   });
 
+  function productTypeForPreset(id: string): ProductType | null {
+    if (id.startsWith("photobook_")) return "case_bound";
+    if (id === "card_a6_greetings") return "single_page";
+    if (id === "print_6x4") return "single_page";
+    if (id === "leaflet_dl") return "leaflet_2pp";
+    return null;
+  }
+
   function applyApiPreset(p: PresetEntry) {
     if (p.spec.units) setValue("units", p.spec.units);
     if (p.spec.min_dpi) setValue("min_dpi", p.spec.min_dpi);
@@ -222,17 +244,22 @@ export default function SubmitJob() {
       setValue("page_count_must_be_even", p.spec.page_count.must_be_even);
     }
     setValue("pages", p.spec.pages.map((pg) => ({ ...pg, label: "" })));
+    const pt = productTypeForPreset(p.id);
+    if (pt) setProductType(pt);
     toast.success(`Preset loaded: ${p.name}`);
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    slot: "cover" | "text",
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/pdf") {
       toast.error("Only PDF files are supported");
       return;
     }
-    setUploading(true);
+    setUploadingSlot(slot);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
@@ -240,14 +267,20 @@ export default function SubmitJob() {
       const { error } = await supabase.storage.from("artwork").upload(path, file);
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from("artwork").getPublicUrl(path);
-      setValue("artwork_url", publicUrl);
-      setValue("artwork_filename", file.name);
+      if (slot === "cover") {
+        setCoverUrl(publicUrl);
+        setCoverFilename(file.name);
+      } else {
+        setTextUrl(publicUrl);
+        setTextFilename(file.name);
+      }
       toast.success("PDF uploaded successfully");
     } catch (err: any) {
       toast.error(err.message || "Upload failed");
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadingSlot(null);
+      if (slot === "cover" && coverInputRef.current) coverInputRef.current.value = "";
+      if (slot === "text" && textInputRef.current) textInputRef.current.value = "";
     }
   };
 
@@ -281,13 +314,32 @@ export default function SubmitJob() {
     setOpenSpecs(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
+  const canSubmit = hasSeparateCover
+    ? Boolean(coverUrl && textUrl)
+    : Boolean(textUrl);
+
   const onSubmit = async (values: FormValues) => {
+    if (!textUrl) {
+      toast.error("Please upload an artwork file");
+      return;
+    }
+    if (hasSeparateCover && !coverUrl) {
+      toast.error("Please upload a cover file");
+      return;
+    }
     try {
-      const payload = buildPayload(values);
+      const artwork: SubmitJobPayload["artwork"] = coverUrl
+        ? [
+            { url: coverUrl, filename: coverFilename, role: "cover" },
+            { url: textUrl, filename: textFilename, role: "text" },
+          ]
+        : hasSeparateCover
+        ? [{ url: textUrl, filename: textFilename, role: "text" }]
+        : [{ url: textUrl, filename: textFilename }];
+
+      const payload = buildPayload(values, productType, artwork);
       const result = await submitJob.mutateAsync(payload);
 
-      // Job row is now created server-side in submit-job edge function
-      // Query it by job_id to get the DB row id for navigation
       const { data: jobRow } = await supabase
         .from("jobs")
         .select("id")
@@ -340,56 +392,102 @@ export default function SubmitJob() {
           </Card>
         )}
 
+        {/* Product type */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Product type</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Select
+              value={productType}
+              onValueChange={(v) => setProductType(v as ProductType)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="single_page">Single page (postcard, business card)</SelectItem>
+                <SelectItem value="leaflet_2pp">Leaflet (front + back)</SelectItem>
+                <SelectItem value="saddle_stitched">Saddle-stitched booklet</SelectItem>
+                <SelectItem value="perfect_bound">Perfect bound book</SelectItem>
+                <SelectItem value="case_bound">Case bound (hardback)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Determines how multiple files are assembled into reader order.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Artwork */}
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Artwork</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Upload PDF</Label>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
-                  ) : (
-                    <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
-                  )}
-                </Button>
-                <span className="text-xs text-muted-foreground">or enter a URL below</span>
-              </div>
-            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Job ID (optional)</Label>
                 <Input {...register("job_id")} placeholder="e.g. test-002" />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+            {hasSeparateCover && (
               <div className="space-y-2">
-                <Label>Artwork URL *</Label>
-                <Input {...register("artwork_url")} placeholder="https://..." />
-                {errors.artwork_url && (
-                  <p className="text-sm text-destructive">{errors.artwork_url.message}</p>
-                )}
+                <Label>Cover file *</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={coverInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, "cover")}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={uploadingSlot !== null}
+                  >
+                    {uploadingSlot === "cover" ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><Upload className="h-4 w-4 mr-2" /> Choose cover PDF</>
+                    )}
+                  </Button>
+                  {coverFilename && (
+                    <span className="text-xs text-muted-foreground truncate">{coverFilename}</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cover should be 2 pages (front + back) or 4 pages (front, inside front, inside back, back).
+                  Required for binding to assemble correctly.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Filename *</Label>
-                <Input {...register("artwork_filename")} placeholder="file.pdf" />
-                {errors.artwork_filename && (
-                  <p className="text-sm text-destructive">{errors.artwork_filename.message}</p>
+            )}
+
+            <div className="space-y-2">
+              <Label>{hasSeparateCover ? "Text file *" : "Artwork *"}</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={textInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => handleFileUpload(e, "text")}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => textInputRef.current?.click()}
+                  disabled={uploadingSlot !== null}
+                >
+                  {uploadingSlot === "text" ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading…</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
+                  )}
+                </Button>
+                {textFilename && (
+                  <span className="text-xs text-muted-foreground truncate">{textFilename}</span>
                 )}
               </div>
             </div>
@@ -668,7 +766,7 @@ export default function SubmitJob() {
 
         {/* Submit */}
         <div className="flex gap-3">
-          <Button type="submit" className="flex-1" disabled={submitJob.isPending}>
+          <Button type="submit" className="flex-1" disabled={submitJob.isPending || !canSubmit}>
             {submitJob.isPending ? "Submitting…" : "Submit Job"}
           </Button>
           <Button

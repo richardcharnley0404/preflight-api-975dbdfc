@@ -119,11 +119,11 @@ export interface SubmitJobPayload {
   webhook?: { url: string; secret: string };
   proof?: { generate: boolean; expires_hours: number };
   spec: {
-    units: "mm" | "in";
+    units: "mm" | "inches";
     pages: PageSpec[];
     page_count: { min: number; max: number; must_be_even: boolean };
     min_dpi: number;
-    colour_space: "any" | "CMYK" | "RGB";
+    colour_space: "any" | "cmyk" | "rgb";
     font_check: boolean;
     dimension_tolerance_mm: number;
   };

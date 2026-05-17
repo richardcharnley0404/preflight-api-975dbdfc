@@ -65,7 +65,7 @@ const formSchema = z.object({
   proof_expires_hours: z.coerce.number().int().positive().optional(),
   units: z.enum(["mm", "inches"]),
   min_dpi: z.coerce.number().int().positive(),
-  colour_space: z.enum(["any", "CMYK", "RGB"]),
+  colour_space: z.enum(["any", "cmyk", "rgb"]),
   font_check: z.boolean(),
   dimension_tolerance_mm: z.coerce.number().positive(),
   page_count_min: z.coerce.number().int().positive(),
@@ -358,12 +358,12 @@ export default function SubmitJob() {
                 <Label>Units</Label>
                 <Select
                   value={watch("units")}
-                  onValueChange={(v) => setValue("units", v as "mm" | "in")}
+                  onValueChange={(v) => setValue("units", v as "mm" | "inches")}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="mm">mm</SelectItem>
-                    <SelectItem value="in">in</SelectItem>
+                    <SelectItem value="inches">inches</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -376,13 +376,13 @@ export default function SubmitJob() {
                 <Label>Colour Space</Label>
                 <Select
                   value={watch("colour_space")}
-                  onValueChange={(v) => setValue("colour_space", v as "any" | "CMYK" | "RGB")}
+                  onValueChange={(v) => setValue("colour_space", v as "any" | "cmyk" | "rgb")}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="any">Any</SelectItem>
-                    <SelectItem value="CMYK">CMYK</SelectItem>
-                    <SelectItem value="RGB">RGB</SelectItem>
+                    <SelectItem value="cmyk">CMYK</SelectItem>
+                    <SelectItem value="rgb">RGB</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

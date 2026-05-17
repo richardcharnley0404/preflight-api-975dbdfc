@@ -63,7 +63,7 @@ const formSchema = z.object({
   artwork_filename: z.string().min(1, "Required"),
   proof_generate: z.boolean(),
   proof_expires_hours: z.coerce.number().int().positive().optional(),
-  units: z.enum(["mm", "in"]),
+  units: z.enum(["mm", "inches"]),
   min_dpi: z.coerce.number().int().positive(),
   colour_space: z.enum(["any", "CMYK", "RGB"]),
   font_check: z.boolean(),

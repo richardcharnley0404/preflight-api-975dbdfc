@@ -191,9 +191,20 @@ export default function SubmitJob() {
   const navigate = useNavigate();
   const submitJob = useSubmitJob();
 
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [productType, setProductType] = useState<ProductType>("single_page");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [coverFilename, setCoverFilename] = useState("");
+  const [textUrl, setTextUrl] = useState("");
+  const [textFilename, setTextFilename] = useState("");
+  const [uploadingSlot, setUploadingSlot] = useState<"cover" | "text" | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const [openSpecs, setOpenSpecs] = useState<Record<number, boolean>>({0: true});
+
+  const hasSeparateCover =
+    productType === "saddle_stitched" ||
+    productType === "perfect_bound" ||
+    productType === "case_bound";
 
   const {
     register,
@@ -213,6 +224,14 @@ export default function SubmitJob() {
     staleTime: 60 * 60 * 1000,
   });
 
+  function productTypeForPreset(id: string): ProductType | null {
+    if (id.startsWith("photobook_")) return "case_bound";
+    if (id === "card_a6_greetings") return "single_page";
+    if (id === "print_6x4") return "single_page";
+    if (id === "leaflet_dl") return "leaflet_2pp";
+    return null;
+  }
+
   function applyApiPreset(p: PresetEntry) {
     if (p.spec.units) setValue("units", p.spec.units);
     if (p.spec.min_dpi) setValue("min_dpi", p.spec.min_dpi);
@@ -225,17 +244,22 @@ export default function SubmitJob() {
       setValue("page_count_must_be_even", p.spec.page_count.must_be_even);
     }
     setValue("pages", p.spec.pages.map((pg) => ({ ...pg, label: "" })));
+    const pt = productTypeForPreset(p.id);
+    if (pt) setProductType(pt);
     toast.success(`Preset loaded: ${p.name}`);
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    slot: "cover" | "text",
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== "application/pdf") {
       toast.error("Only PDF files are supported");
       return;
     }
-    setUploading(true);
+    setUploadingSlot(slot);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
@@ -243,14 +267,20 @@ export default function SubmitJob() {
       const { error } = await supabase.storage.from("artwork").upload(path, file);
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from("artwork").getPublicUrl(path);
-      setValue("artwork_url", publicUrl);
-      setValue("artwork_filename", file.name);
+      if (slot === "cover") {
+        setCoverUrl(publicUrl);
+        setCoverFilename(file.name);
+      } else {
+        setTextUrl(publicUrl);
+        setTextFilename(file.name);
+      }
       toast.success("PDF uploaded successfully");
     } catch (err: any) {
       toast.error(err.message || "Upload failed");
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUploadingSlot(null);
+      if (slot === "cover" && coverInputRef.current) coverInputRef.current.value = "";
+      if (slot === "text" && textInputRef.current) textInputRef.current.value = "";
     }
   };
 
@@ -284,13 +314,32 @@ export default function SubmitJob() {
     setOpenSpecs(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
+  const canSubmit = hasSeparateCover
+    ? Boolean(coverUrl && textUrl)
+    : Boolean(textUrl);
+
   const onSubmit = async (values: FormValues) => {
+    if (!textUrl) {
+      toast.error("Please upload an artwork file");
+      return;
+    }
+    if (hasSeparateCover && !coverUrl) {
+      toast.error("Please upload a cover file");
+      return;
+    }
     try {
-      const payload = buildPayload(values);
+      const artwork: SubmitJobPayload["artwork"] = coverUrl
+        ? [
+            { url: coverUrl, filename: coverFilename, role: "cover" },
+            { url: textUrl, filename: textFilename, role: "text" },
+          ]
+        : hasSeparateCover
+        ? [{ url: textUrl, filename: textFilename, role: "text" }]
+        : [{ url: textUrl, filename: textFilename }];
+
+      const payload = buildPayload(values, productType, artwork);
       const result = await submitJob.mutateAsync(payload);
 
-      // Job row is now created server-side in submit-job edge function
-      // Query it by job_id to get the DB row id for navigation
       const { data: jobRow } = await supabase
         .from("jobs")
         .select("id")

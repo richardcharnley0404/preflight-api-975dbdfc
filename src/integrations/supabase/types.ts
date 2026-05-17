@@ -54,9 +54,11 @@ export type Database = {
           job_id: string | null
           passed: boolean | null
           proof_url: string | null
+          results: Json | null
           status: string
           submitted_at: string
           user_id: string | null
+          webhook_delivered: boolean | null
         }
         Insert: {
           callback_url?: string | null
@@ -67,9 +69,11 @@ export type Database = {
           job_id?: string | null
           passed?: boolean | null
           proof_url?: string | null
+          results?: Json | null
           status?: string
           submitted_at?: string
           user_id?: string | null
+          webhook_delivered?: boolean | null
         }
         Update: {
           callback_url?: string | null
@@ -80,9 +84,11 @@ export type Database = {
           job_id?: string | null
           passed?: boolean | null
           proof_url?: string | null
+          results?: Json | null
           status?: string
           submitted_at?: string
           user_id?: string | null
+          webhook_delivered?: boolean | null
         }
         Relationships: []
       }

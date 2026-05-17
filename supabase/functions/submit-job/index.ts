@@ -57,9 +57,6 @@ Deno.serve(async (req) => {
       secret: webhookSecret || "",
     };
 
-    // Include user_id so Railway can echo it back in the webhook
-    payload.user_id = userId;
-
     // Forward to Railway
     const res = await fetch(`${RAILWAY_API}/api/jobs`, {
       method: "POST",
@@ -79,12 +76,13 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
 
-      await serviceClient.from("jobs").insert({
+      const { error: upsertError } = await serviceClient.from("jobs").upsert({
         user_id: userId,
         job_id: body.job_id,
         filename: payload.artwork?.filename || null,
-        status: body.status || "pending",
-      });
+        status: body.status || "queued",
+      }, { onConflict: "job_id" });
+      if (upsertError) console.error("[submit-job] Supabase upsert failed:", upsertError.message);
     }
 
     return new Response(JSON.stringify(body), {

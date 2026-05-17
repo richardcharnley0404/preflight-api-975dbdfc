@@ -210,7 +210,7 @@ export default function SubmitJob() {
     staleTime: 60 * 60 * 1000,
   });
 
-  function applyPreset(p: PresetEntry) {
+  function applyApiPreset(p: PresetEntry) {
     if (p.spec.units) setValue("units", p.spec.units);
     if (p.spec.min_dpi) setValue("min_dpi", p.spec.min_dpi);
     if (p.spec.colour_space) setValue("colour_space", p.spec.colour_space);

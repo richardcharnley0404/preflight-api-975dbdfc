@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const RAILWAY_BASE = "https://preflight-api-production.up.railway.app";
+const RAILWAY_BASE = "https://preflight-api.printautomation.co.uk";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {

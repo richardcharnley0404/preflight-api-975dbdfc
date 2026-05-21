@@ -229,10 +229,21 @@ export default function JobDetail() {
   const summary = results?.summary;
   const errorMessage = (job as unknown as { error_message?: string }).error_message;
 
+  const STUCK_MS = 5 * 60 * 1000;
+  const submittedAgeMs = job.submitted_at ? Date.now() - new Date(job.submitted_at).getTime() : 0;
+  const isStuck =
+    (job.status === "queued" || job.status === "processing" || job.status === "pending") &&
+    submittedAgeMs > STUCK_MS;
   const showRetry =
     job.status === "failed" ||
+    isStuck ||
     (job.status === "completed" && job.webhook_delivered === false);
-  const retryLabel = job.status === "failed" ? "Retry job" : "Retry webhook";
+  const retryLabel =
+    job.status === "failed"
+      ? "Retry job"
+      : isStuck
+        ? "Re-queue job"
+        : "Retry webhook";
 
   return (
     <div className="space-y-6">

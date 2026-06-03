@@ -17,6 +17,7 @@ import JobDetail from "./pages/JobDetail";
 import Billing from "./pages/Billing";
 import SubmitJob from "./pages/SubmitJob";
 import ApiDocs from "./pages/ApiDocs";
+import Configurations from "./pages/Configurations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="jobs/:jobId" element={<JobDetail />} />
               <Route path="billing" element={<Billing />} />
               <Route path="submit" element={<SubmitJob />} />
+              <Route path="configurations" element={<Configurations />} />
               <Route path="docs" element={<ApiDocs />} />
             </Route>
             <Route path="*" element={<NotFound />} />

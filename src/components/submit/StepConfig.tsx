@@ -61,16 +61,25 @@ export function StepConfig({
 }) {
   const { data, isLoading } = useCustomPresets();
 
-  const { custom, builtin } = useMemo(
+  const { system, custom, builtin } = useMemo(
     () => filterPresetsForProduct(data?.presets ?? [], product),
     [data, product],
   );
 
-  const noConfigs = !isLoading && custom.length === 0 && builtin.length === 0;
-
   return (
     <div className="space-y-6">
       {isLoading && <Skeleton className="h-40" />}
+
+      {system.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">System default</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {system.map((p) => (
+              <PresetCard key={p.id} preset={p} selected={selectedPresetId === p.id} onClick={() => onSelect(p.id)} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {custom.length > 0 && (
         <div className="space-y-2">
@@ -94,13 +103,14 @@ export function StepConfig({
         </div>
       )}
 
-      {noConfigs && (
+      {!isLoading && custom.length === 0 && builtin.length === 0 && (
         <Card>
-          <CardContent className="py-6 text-sm text-muted-foreground">
-            No configurations available for this product. Ask your admin to create one in{" "}
+          <CardContent className="py-4 text-xs text-muted-foreground">
+            The system default applies to every product. Create your own in{" "}
             <Link to="/dashboard/configurations" className="text-primary underline">
               Configurations
-            </Link>.
+            </Link>{" "}
+            to override it.
           </CardContent>
         </Card>
       )}
@@ -122,15 +132,17 @@ function PresetCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const badgeLabel =
+    preset.source === "custom" ? "Yours" : preset.source === "system" ? "System" : "Default";
+  const badgeVariant: "default" | "secondary" | "outline" =
+    preset.source === "custom" ? "default" : preset.source === "system" ? "secondary" : "outline";
   return (
     <button type="button" onClick={onClick} className="text-left focus:outline-none">
       <Card className={selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/50"}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">{preset.name}</CardTitle>
-            <Badge variant={preset.source === "custom" ? "default" : "outline"}>
-              {preset.source === "custom" ? "Yours" : "Default"}
-            </Badge>
+            <Badge variant={badgeVariant}>{badgeLabel}</Badge>
           </div>
           {preset.description && <CardDescription>{preset.description}</CardDescription>}
         </CardHeader>

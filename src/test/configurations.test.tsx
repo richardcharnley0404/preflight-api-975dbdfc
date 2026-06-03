@@ -32,14 +32,15 @@ describe("custom preset CRUD", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("lists presets via GET /api/dashboard/presets/custom/list", async () => {
-    (api.apiGet as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (api.apiGet as ReturnType<typeof vi.fn>).mockResolvedValue({
       presets: [{ id: "x", preset_id: "x", name: "X", spec: {}, for_product_types: [] }],
     });
     const { result } = renderHook(() => useCustomPresets(), { wrapper });
-    await result.current.refetch();
+    const refetched = await result.current.refetch();
     expect(api.apiGet).toHaveBeenCalledWith("/api/dashboard/presets/custom/list");
-    expect(result.current.data?.presets).toHaveLength(1);
+    expect(refetched.data?.presets).toHaveLength(1);
   });
+
 
 
   it("creates via POST", async () => {

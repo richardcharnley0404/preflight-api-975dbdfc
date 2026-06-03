@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiDelete, apiUpload } from "@/lib/api";
+import { apiGet, apiPost, apiPut, apiDelete, apiUpload } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
+
 
 // ─── Dashboard ───
 export interface DashboardStats {
@@ -115,20 +116,24 @@ export interface PageSpec {
 
 export interface SubmitJobPayload {
   job_id?: string;
-  artwork: Array<{ url: string; filename: string; role?: "cover" | "text" }>;
-  webhook?: { url: string; secret: string };
-  proof?: { generate: boolean; expires_hours: number };
+  artwork: Array<{ url: string; filename: string; role?: string }>;
+  webhook?: { url: string; secret: string; events?: string[] };
+  proof?: { generate: boolean; expires_hours?: number; thumbnails?: { count: number } };
+  // Spec can be either the legacy fully-explicit form or the new product-led
+  // form `{ preset, product: { type } }`. Backend accepts both.
   spec: {
-    units: "mm" | "inches";
-    pages: PageSpec[];
-    page_count: { min: number; max: number; must_be_even: boolean };
-    min_dpi: number;
-    colour_space: "any" | "cmyk" | "rgb";
-    font_check: boolean;
-    dimension_tolerance_mm: number;
-    product?: { type: "single_page" | "leaflet_2pp" | "saddle_stitched" | "perfect_bound" | "case_bound" };
+    preset?: string;
+    product?: { type: string };
+    units?: "mm" | "inches";
+    pages?: PageSpec[];
+    page_count?: { min: number; max: number; must_be_even: boolean };
+    min_dpi?: number;
+    colour_space?: "any" | "cmyk" | "rgb";
+    font_check?: boolean;
+    dimension_tolerance_mm?: number;
   };
 }
+
 
 export interface SubmitJobResponse {
   job_id: string;

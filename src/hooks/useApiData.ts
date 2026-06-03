@@ -107,7 +107,7 @@ export function useJobDetail(jobId: string | undefined) {
 
 // ─── Submit Job ───
 export interface PageSpec {
-  type: "combined" | "front" | "back";
+  type: string;
   range: string;
   trim: { width: number; height: number };
   bleed: { left: number; right: number; top: number; bottom: number };

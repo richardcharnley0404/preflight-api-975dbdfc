@@ -81,6 +81,7 @@ export default function Configurations() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">Default</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>Applies to</TableHead>
@@ -90,6 +91,22 @@ export default function Configurations() {
             </TableHeader>
             <TableBody>
               <TableRow>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleSetDefault(STANDARD_PRESET.preset_id)}
+                    aria-label={effectiveDefault === STANDARD_PRESET.preset_id ? "Default" : "Set as default"}
+                  >
+                    <Star
+                      className={
+                        effectiveDefault === STANDARD_PRESET.preset_id
+                          ? "h-4 w-4 fill-primary text-primary"
+                          : "h-4 w-4 text-muted-foreground"
+                      }
+                    />
+                  </Button>
+                </TableCell>
                 <TableCell>
                   <div className="font-medium flex items-center gap-2">
                     {STANDARD_PRESET.name}
@@ -106,13 +123,29 @@ export default function Configurations() {
               </TableRow>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-3">
+                  <TableCell colSpan={6} className="py-3">
                     <Skeleton className="h-6" />
                   </TableCell>
                 </TableRow>
               ) : (
                 data?.presets?.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleSetDefault(p.preset_id)}
+                        aria-label={effectiveDefault === p.preset_id ? "Default" : "Set as default"}
+                      >
+                        <Star
+                          className={
+                            effectiveDefault === p.preset_id
+                              ? "h-4 w-4 fill-primary text-primary"
+                              : "h-4 w-4 text-muted-foreground"
+                          }
+                        />
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
                       {p.description && <div className="text-xs text-muted-foreground">{p.description}</div>}

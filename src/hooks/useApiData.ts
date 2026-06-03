@@ -112,6 +112,7 @@ export interface PageSpec {
   trim: { width: number; height: number };
   bleed: { left: number; right: number; top: number; bottom: number };
   safe_zone: { left: number; right: number; top: number; bottom: number };
+  spine_mm?: number;
 }
 
 export interface SubmitJobPayload {

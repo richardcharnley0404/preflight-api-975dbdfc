@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { apiPost } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ProgressiveStatus } from "@/components/ProgressiveStatus";
+
 
 // ─── Types ───
 
@@ -279,7 +281,25 @@ export default function JobDetail() {
         )}
       </div>
 
+      {/* Progressive status (in-flight) */}
+      {job.status !== "completed" && job.status !== "failed" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Status</CardTitle>
+            <CardDescription>We'll update this as your artwork moves through preflight.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ProgressiveStatus
+              statusEvent={(job as unknown as { status_event?: string }).status_event ?? null}
+              isTerminal={false}
+              proofUrl={job.proof_url}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Fixed artwork banner */}
+
       {fixed?.url && (
         <Card className="border-success/30 bg-success/5">
           <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">

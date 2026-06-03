@@ -17,48 +17,54 @@ Deno.serve(async (req) => {
   const url = new URL(req.url);
   const path = url.searchParams.get("path");
 
-  if (!path || !path.startsWith("/api/")) {
+  if (!path || !(path.startsWith("/api/") || path.startsWith("/v1/"))) {
     return new Response(
       JSON.stringify({ error: "Invalid or missing path parameter" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  // Authenticate via JWT
+  // /v1/products is a public catalogue — skip auth
+  const isPublic = path === "/v1/products" || path.startsWith("/v1/products?");
+
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  if (!isPublic) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
     );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error } = await supabase.auth.getClaims(token);
+    if (error || !data?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   }
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
 
   // Forward request to Railway
   const targetUrl = `${RAILWAY_BASE}${path}`;
   const forwardHeaders: Record<string, string> = {
-    Authorization: authHeader,
     "Content-Type": req.headers.get("Content-Type") || "application/json",
   };
+  if (authHeader) forwardHeaders.Authorization = authHeader;
 
   const fetchOptions: RequestInit = {
     method: req.method,
     headers: forwardHeaders,
   };
+
 
   // Forward body for non-GET requests
   if (req.method !== "GET" && req.method !== "HEAD") {

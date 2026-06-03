@@ -126,6 +126,7 @@ export default function Configurations() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>

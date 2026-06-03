@@ -121,6 +121,8 @@ export default function SubmitJob() {
               product={product}
               files={files}
               setFiles={setFiles}
+              spineMm={spineMm}
+              setSpineMm={setSpineMm}
               onBack={() => setStep(1)}
               onNext={() => setStep(3)}
             />

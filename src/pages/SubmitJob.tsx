@@ -43,12 +43,20 @@ export default function SubmitJob() {
       const { trim_default, bleed_default, safe_zone_default, units, min_dpi, colour_space, font_check, dimension_tolerance_mm } = STANDARD_PRESET.spec;
       const bleed = { left: bleed_default, right: bleed_default, top: bleed_default, bottom: bleed_default };
       const safe_zone = { left: safe_zone_default, right: safe_zone_default, top: safe_zone_default, bottom: safe_zone_default };
+      // For perfect-bound products the cover entry must include `spine_mm`.
+      // Estimate from the text file's page count (≈0.1mm per leaf), min 3mm.
+      const textFile = Object.entries(files).find(([role]) => role === "text")?.[1];
+      const spine_mm = textFile
+        ? Math.max(3, Math.round((textFile.pages / 2) * 0.1 * 10) / 10)
+        : 5;
+      const needsSpine = product.id === "perfect_bound_cover_spread";
       const pages = Object.entries(files).map(([role, f]) => ({
         type: role,
         range: f.pages > 1 ? `1-${f.pages}` : "1",
         trim: { width: trim_default.width, height: trim_default.height },
         bleed,
         safe_zone,
+        ...(needsSpine && role === "cover" ? { spine_mm } : {}),
       }));
       spec = {
         product: { type: product.id },

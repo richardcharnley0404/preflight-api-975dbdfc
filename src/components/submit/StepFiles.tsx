@@ -137,18 +137,26 @@ function FileSlot({
             </Button>
           </div>
         ) : (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploading || validating}
-          >
-            {uploading || validating ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {validating ? "Checking…" : "Uploading…"}</>
-            ) : (
-              <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading || validating}
+            >
+              {uploading || validating ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {validating ? "Checking…" : `Uploading… ${progress}%`}</>
+              ) : (
+                <><Upload className="h-4 w-4 mr-2" /> Choose PDF</>
+              )}
+            </Button>
+            {uploading && (
+              <div className="space-y-1">
+                <Progress value={progress} className="h-2" />
+                <p className="text-xs text-muted-foreground">{progress}%</p>
+              </div>
             )}
-          </Button>
+          </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>

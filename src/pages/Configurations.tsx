@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCustomPresets, useDeleteCustomPreset, type CustomPreset } from "@/hooks/useApiData";
 import { ConfigurationDialog } from "@/components/configurations/ConfigurationDialog";
+import { STANDARD_PRESET } from "@/lib/standardPreset";
 
 export default function Configurations() {
   const { data, isLoading, error } = useCustomPresets();

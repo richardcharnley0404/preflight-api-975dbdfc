@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -36,10 +36,11 @@ describe("custom preset CRUD", () => {
       presets: [{ id: "x", preset_id: "x", name: "X", spec: {}, for_product_types: [] }],
     });
     const { result } = renderHook(() => useCustomPresets(), { wrapper });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await result.current.refetch();
     expect(api.apiGet).toHaveBeenCalledWith("/api/dashboard/presets/custom/list");
     expect(result.current.data?.presets).toHaveLength(1);
   });
+
 
   it("creates via POST", async () => {
     (api.apiPost as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });

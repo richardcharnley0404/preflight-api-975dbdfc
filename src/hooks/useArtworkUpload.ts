@@ -32,19 +32,17 @@ export function useArtworkUpload() {
 // Uses pdfjs-dist; worker is disabled (slower but no extra setup needed).
 export async function readPdfPageCount(file: File): Promise<number> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  // Disable worker to keep bundling simple
-  // @ts-expect-error - GlobalWorkerOptions exists at runtime
-  pdfjs.GlobalWorkerOptions.workerSrc = "";
+  (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
   const arrayBuffer = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({
     data: arrayBuffer,
-    disableWorker: true,
     isEvalSupported: false,
   }).promise;
   const n = doc.numPages;
   await doc.destroy();
   return n;
 }
+
 
 export interface FileSlotConstraints {
   min_pages?: number;

@@ -73,7 +73,7 @@ function FileSlot({
   onClear: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const { upload, uploading } = useArtworkUpload();
+  const { upload, uploading, progress } = useArtworkUpload();
   const [error, setError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
 

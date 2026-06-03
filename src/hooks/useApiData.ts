@@ -182,6 +182,90 @@ export function useSubmitJob() {
   });
 }
 
+// ─── Products catalogue ───
+export interface ProductFileSlot {
+  role: string;
+  required?: boolean;
+  min_pages?: number;
+  max_pages?: number;
+  exact_pages?: number;
+  page_count_divisible_by?: number;
+  help?: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  files: ProductFileSlot[];
+  binding?: string;
+  assembly?: string;
+  suggested_presets?: string[];
+}
+
+export function useProducts() {
+  return useQuery({
+    queryKey: ["products"],
+    queryFn: () => apiGet<{ products: Product[] }>("/v1/products"),
+    staleTime: 60 * 60 * 1000,
+  });
+}
+
+// ─── Custom presets (org configurations) ───
+export interface CustomPreset {
+  id: string;
+  preset_id: string;
+  name: string;
+  description?: string;
+  spec: Record<string, unknown>;
+  for_product_types: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomPresetInput {
+  preset_id: string;
+  name: string;
+  description?: string;
+  spec: Record<string, unknown>;
+  for_product_types: string[];
+}
+
+export function useCustomPresets() {
+  return useQuery({
+    queryKey: ["custom-presets"],
+    queryFn: () => apiGet<{ presets: CustomPreset[] }>("/api/dashboard/presets/custom/list"),
+  });
+}
+
+export function useCreateCustomPreset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CustomPresetInput) =>
+      apiPost<CustomPreset>("/api/dashboard/presets/custom", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["custom-presets"] }),
+  });
+}
+
+export function useUpdateCustomPreset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ preset_id, ...body }: Partial<CustomPresetInput> & { preset_id: string }) =>
+      apiPut<CustomPreset>(`/api/dashboard/presets/custom/${preset_id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["custom-presets"] }),
+  });
+}
+
+export function useDeleteCustomPreset() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (preset_id: string) =>
+      apiDelete<void>(`/api/dashboard/presets/custom/${preset_id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["custom-presets"] }),
+  });
+}
+
+
 // ─── API Keys ───
 export interface ApiKey {
   id: string;

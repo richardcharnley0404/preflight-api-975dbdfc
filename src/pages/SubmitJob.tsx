@@ -112,6 +112,7 @@ export default function SubmitJob() {
               onPick={(p) => {
                 setProduct(p);
                 setFiles({});
+                setSpineMm(undefined);
                 setPresetId(undefined);
                 setStep(2);
               }}

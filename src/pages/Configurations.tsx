@@ -64,11 +64,13 @@ export default function Configurations() {
               <Skeleton className="h-10" />
               <Skeleton className="h-10" />
             </div>
-          ) : error ? (
-            <p className="p-6 text-sm text-destructive">
-              {error instanceof Error ? error.message : "Failed to load configurations"}
-            </p>
           ) : (
+            <>
+              {error && (
+                <p className="px-6 pt-4 text-xs text-muted-foreground">
+                  Couldn't load your custom configurations: {error instanceof Error ? error.message : "unknown error"}. The system default below is always available.
+                </p>
+              )}
             <Table>
               <TableHeader>
                 <TableRow>

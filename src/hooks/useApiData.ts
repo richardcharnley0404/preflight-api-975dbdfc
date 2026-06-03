@@ -235,6 +235,7 @@ export function useCustomPresets() {
   return useQuery({
     queryKey: ["custom-presets"],
     queryFn: () => apiGet<{ presets: CustomPreset[] }>("/api/dashboard/presets/custom/list"),
+    retry: false,
   });
 }
 

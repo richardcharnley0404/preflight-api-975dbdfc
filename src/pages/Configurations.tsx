@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Star } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useCustomPresets, useDeleteCustomPreset, type CustomPreset } from "@/hooks/useApiData";
+import { useDefaultPreset, useSetDefaultPreset } from "@/hooks/useDefaultPreset";
 import { ConfigurationDialog } from "@/components/configurations/ConfigurationDialog";
 import { STANDARD_PRESET } from "@/lib/standardPreset";
 
 export default function Configurations() {
   const { data, isLoading, error } = useCustomPresets();
+  const { data: defaultPresetId } = useDefaultPreset();
+  const setDefault = useSetDefaultPreset();
   const deleteMut = useDeleteCustomPreset();
   const [editing, setEditing] = useState<CustomPreset | undefined>();
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CustomPreset | null>(null);
+
+  const effectiveDefault = defaultPresetId ?? STANDARD_PRESET.preset_id;
+
+  const handleSetDefault = async (preset_id: string) => {
+    try {
+      await setDefault.mutateAsync(preset_id);
+      toast.success("Default configuration updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't set default");
+    }
+  };
 
   const openCreate = () => { setEditing(undefined); setOpen(true); };
   const openEdit = (p: CustomPreset) => { setEditing(p); setOpen(true); };

@@ -68,10 +68,6 @@ export default function Configurations() {
             <p className="p-6 text-sm text-destructive">
               {error instanceof Error ? error.message : "Failed to load configurations"}
             </p>
-          ) : !data?.presets?.length ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              No configurations yet. Create one to get started.
-            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -84,7 +80,22 @@ export default function Configurations() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.presets.map((p) => (
+                <TableRow>
+                  <TableCell>
+                    <div className="font-medium flex items-center gap-2">
+                      {STANDARD_PRESET.name}
+                      <Badge variant="secondary" className="text-xs">System</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{STANDARD_PRESET.description}</div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{STANDARD_PRESET.preset_id}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">All products</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">Read-only</TableCell>
+                </TableRow>
+                {data?.presets?.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>

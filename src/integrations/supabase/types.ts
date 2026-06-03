@@ -56,6 +56,7 @@ export type Database = {
           proof_url: string | null
           results: Json | null
           status: string
+          status_event: string | null
           submitted_at: string
           user_id: string | null
           webhook_delivered: boolean | null
@@ -71,6 +72,7 @@ export type Database = {
           proof_url?: string | null
           results?: Json | null
           status?: string
+          status_event?: string | null
           submitted_at?: string
           user_id?: string | null
           webhook_delivered?: boolean | null
@@ -86,6 +88,7 @@ export type Database = {
           proof_url?: string | null
           results?: Json | null
           status?: string
+          status_event?: string | null
           submitted_at?: string
           user_id?: string | null
           webhook_delivered?: boolean | null

@@ -59,45 +59,45 @@ export default function Configurations() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-2">
-              <Skeleton className="h-10" />
-              <Skeleton className="h-10" />
-            </div>
-          ) : (
-            <>
-              {error && (
-                <p className="px-6 pt-4 text-xs text-muted-foreground">
-                  Couldn't load your custom configurations: {error instanceof Error ? error.message : "unknown error"}. The system default below is always available.
-                </p>
-              )}
-            <Table>
-              <TableHeader>
+          {error && (
+            <p className="px-6 pt-4 text-xs text-muted-foreground">
+              Couldn't load your custom configurations: {error instanceof Error ? error.message : "unknown error"}. The system default below is always available.
+            </p>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Applies to</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>
+                  <div className="font-medium flex items-center gap-2">
+                    {STANDARD_PRESET.name}
+                    <Badge variant="secondary" className="text-xs">System</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{STANDARD_PRESET.description}</div>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{STANDARD_PRESET.preset_id}</TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="text-xs">All products</Badge>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground">Read-only</TableCell>
+              </TableRow>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Applies to</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>
-                    <div className="font-medium flex items-center gap-2">
-                      {STANDARD_PRESET.name}
-                      <Badge variant="secondary" className="text-xs">System</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">{STANDARD_PRESET.description}</div>
+                  <TableCell colSpan={5} className="py-3">
+                    <Skeleton className="h-6" />
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{STANDARD_PRESET.preset_id}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs">All products</Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">—</TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">Read-only</TableCell>
                 </TableRow>
-                {data?.presets?.map((p) => (
+              ) : (
+                data?.presets?.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
@@ -123,11 +123,10 @@ export default function Configurations() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            </>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

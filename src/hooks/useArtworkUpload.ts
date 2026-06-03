@@ -9,15 +9,49 @@ export interface UploadedArtwork {
 
 export function useArtworkUpload() {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  async function upload(file: File): Promise<UploadedArtwork> {
+  async function upload(
+    file: File,
+    onProgress?: (pct: number) => void,
+  ): Promise<UploadedArtwork> {
     setUploading(true);
+    setProgress(0);
+    const report = (pct: number) => {
+      setProgress(pct);
+      onProgress?.(pct);
+    };
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       const path = `${session.user.id}/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from("artwork").upload(path, file);
-      if (error) throw error;
+
+      // Use a signed upload URL so we can PUT via XHR and track real progress.
+      const { data: signed, error: signErr } = await supabase
+        .storage.from("artwork").createSignedUploadUrl(path);
+      if (signErr || !signed) throw signErr ?? new Error("Could not create upload URL");
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", signed.signedUrl, true);
+        xhr.setRequestHeader("Content-Type", file.type || "application/pdf");
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            report(Math.round((ev.loaded / ev.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            report(100);
+            resolve();
+          } else {
+            reject(new Error(`Upload failed (${xhr.status})`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
       const { data: { publicUrl } } = supabase.storage.from("artwork").getPublicUrl(path);
       return { url: publicUrl, filename: file.name, size: file.size };
     } finally {
@@ -25,7 +59,7 @@ export function useArtworkUpload() {
     }
   }
 
-  return { upload, uploading };
+  return { upload, uploading, progress };
 }
 
 // Read PDF page count locally so we can validate before submitting.

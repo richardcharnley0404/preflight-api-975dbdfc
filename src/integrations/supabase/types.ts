@@ -100,6 +100,7 @@ export type Database = {
           billing_address: string | null
           company_name: string | null
           created_at: string
+          default_preset_id: string | null
           email: string
           id: string
           plan_tier: string
@@ -109,6 +110,7 @@ export type Database = {
           billing_address?: string | null
           company_name?: string | null
           created_at?: string
+          default_preset_id?: string | null
           email: string
           id: string
           plan_tier?: string
@@ -118,6 +120,7 @@ export type Database = {
           billing_address?: string | null
           company_name?: string | null
           created_at?: string
+          default_preset_id?: string | null
           email?: string
           id?: string
           plan_tier?: string

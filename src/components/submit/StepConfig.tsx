@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { useCustomPresets, type Product, type CustomPreset } from "@/hooks/useApiData";
+import { useDefaultPreset } from "@/hooks/useDefaultPreset";
 import { STANDARD_PRESET } from "@/lib/standardPreset";
 
 export interface ResolvedPreset {
@@ -60,11 +61,23 @@ export function StepConfig({
   onNext: () => void;
 }) {
   const { data, isLoading } = useCustomPresets();
+  const { data: defaultPresetId } = useDefaultPreset();
 
   const { system, custom, builtin } = useMemo(
     () => filterPresetsForProduct(data?.presets ?? [], product),
     [data, product],
   );
+
+  // Auto-select: user's chosen default preset if available for this product,
+  // otherwise the system standard.
+  useEffect(() => {
+    if (selectedPresetId) return;
+    const all = [...system, ...custom, ...builtin];
+    const preferred = defaultPresetId && all.find((p) => p.id === defaultPresetId);
+    if (preferred) onSelect(preferred.id);
+    else if (system[0]) onSelect(system[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultPresetId, data, product.id]);
 
   return (
     <div className="space-y-6">

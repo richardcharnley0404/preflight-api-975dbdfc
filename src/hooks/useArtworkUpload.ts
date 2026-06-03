@@ -29,10 +29,11 @@ export function useArtworkUpload() {
 }
 
 // Read PDF page count locally so we can validate before submitting.
-// Uses pdfjs-dist; worker is disabled (slower but no extra setup needed).
+// Uses pdfjs-dist with the worker bundled by Vite (?url).
 export async function readPdfPageCount(file: File): Promise<number> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = "";
+  const workerUrl = (await import("pdfjs-dist/legacy/build/pdf.worker.mjs?url")).default;
+  (pdfjs as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = workerUrl;
   const arrayBuffer = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({
     data: arrayBuffer,

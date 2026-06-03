@@ -25,6 +25,7 @@ export default function SubmitJob() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [product, setProduct] = useState<Product | undefined>();
   const [files, setFiles] = useState<FilesByRole>({});
+  const [spineMm, setSpineMm] = useState<number | undefined>(undefined);
   const [presetId, setPresetId] = useState<string | undefined>();
 
   const handleSubmit = async () => {

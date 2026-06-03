@@ -44,7 +44,7 @@ export default function SubmitJob() {
       const bleed = { left: bleed_default, right: bleed_default, top: bleed_default, bottom: bleed_default };
       const safe_zone = { left: safe_zone_default, right: safe_zone_default, top: safe_zone_default, bottom: safe_zone_default };
       const pages = Object.entries(files).map(([role, f]) => ({
-        type: (role === "cover" ? "combined" : "combined") as "combined",
+        type: role,
         range: f.pages > 1 ? `1-${f.pages}` : "1",
         trim: { width: trim_default.width, height: trim_default.height },
         bleed,

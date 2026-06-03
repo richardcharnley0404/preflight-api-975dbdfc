@@ -45,4 +45,26 @@ describe("filterPresetsForProduct", () => {
     const { custom } = filterPresetsForProduct(presets, product);
     expect(custom.find((p) => p.id === "our_book")).toBeUndefined();
   });
+
+  it("always includes the Print Pre-flight Standard for every product", () => {
+    const { system } = filterPresetsForProduct(presets, product);
+    expect(system.map((p) => p.id)).toEqual(["printpreflight_standard"]);
+
+    const otherProduct: Product = {
+      id: "case_bound",
+      name: "Case Bound",
+      description: "",
+      files: [],
+      suggested_presets: [],
+    };
+    const { system: system2 } = filterPresetsForProduct([], otherProduct);
+    expect(system2.map((p) => p.id)).toEqual(["printpreflight_standard"]);
+  });
+
+  it("does not duplicate the standard into custom or builtin", () => {
+    const { system, custom, builtin } = filterPresetsForProduct(presets, product);
+    expect(system).toHaveLength(1);
+    expect(custom.find((p) => p.id === "printpreflight_standard")).toBeUndefined();
+    expect(builtin.find((p) => p.id === "printpreflight_standard")).toBeUndefined();
+  });
 });

@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { useCustomPresets, type Product, type CustomPreset } from "@/hooks/useApiData";
+import { useDefaultPreset } from "@/hooks/useDefaultPreset";
 import { STANDARD_PRESET } from "@/lib/standardPreset";
 
 export interface ResolvedPreset {

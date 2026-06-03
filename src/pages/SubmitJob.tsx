@@ -34,13 +34,40 @@ export default function SubmitJob() {
       filename: f.filename,
       role,
     }));
+
+    // Build spec. For the system standard preset we inline the defaults and
+    // synthesize a `pages` array from each uploaded file so the backend has
+    // the per-page trim/bleed/safe-zone it requires.
+    let spec: SubmitJobPayload["spec"];
+    if (isStandardPreset(presetId)) {
+      const { trim_default, bleed_default, safe_zone_default, units, min_dpi, colour_space, font_check, dimension_tolerance_mm } = STANDARD_PRESET.spec;
+      const bleed = { left: bleed_default, right: bleed_default, top: bleed_default, bottom: bleed_default };
+      const safe_zone = { left: safe_zone_default, right: safe_zone_default, top: safe_zone_default, bottom: safe_zone_default };
+      const pages = Object.entries(files).map(([role, f]) => ({
+        type: (role === "cover" ? "combined" : "combined") as "combined",
+        range: f.pages > 1 ? `1-${f.pages}` : "1",
+        trim: { width: trim_default.width, height: trim_default.height },
+        bleed,
+        safe_zone,
+      }));
+      spec = {
+        product: { type: product.id },
+        units,
+        min_dpi,
+        colour_space,
+        font_check,
+        dimension_tolerance_mm,
+        pages,
+      };
+    } else {
+      spec = { preset: presetId, product: { type: product.id } };
+    }
+
     const payload: SubmitJobPayload = {
       job_id: `job-${Date.now()}`,
       artwork,
       proof: { generate: true, thumbnails: { count: 4 } },
-      spec: isStandardPreset(presetId)
-        ? { product: { type: product.id }, ...STANDARD_PRESET.spec }
-        : { preset: presetId, product: { type: product.id } },
+      spec,
     };
     try {
       const result = await submitJob.mutateAsync(payload);

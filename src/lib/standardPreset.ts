@@ -18,6 +18,8 @@ export const STANDARD_PRESET = {
     bleed_default: 3,
     safe_zone_default: 5,
     dimension_tolerance_mm: 0.5,
+    // Default trim used to build per-page specs at submit time (A4)
+    trim_default: { width: 210, height: 297 },
   },
 } as const;
 

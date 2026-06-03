@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
   try {
     const payload = JSON.parse(rawBody);
     const {
+      event,
       job_id,
       status,
       passed,
@@ -101,33 +102,56 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const fullResults = {
-      passed,
-      summary,
-      checks,
-      page_issues,
-      fixed_artwork,
-      proof_url,
-    };
+    const isTerminal =
+      event === "job_completed" ||
+      status === "completed" ||
+      status === "failed" ||
+      passed !== undefined;
 
-    const row: Record<string, unknown> = {
-      job_id,
-      status,
-      passed,
-      proof_url,
-      checks,
-      results: fullResults,
-      completed_at: new Date().toISOString(),
-    };
+    let data: { id?: string; callback_url?: string } | null = null;
+    let error: { message: string } | null = null;
 
-    if (user_id) row.user_id = user_id;
-    if (filename) row.filename = filename;
+    if (isTerminal) {
+      const fullResults = { passed, summary, checks, page_issues, fixed_artwork, proof_url };
+      const row: Record<string, unknown> = {
+        job_id,
+        status: status || "completed",
+        status_event: event || "job_completed",
+        passed,
+        proof_url,
+        checks,
+        results: fullResults,
+        completed_at: new Date().toISOString(),
+      };
+      if (user_id) row.user_id = user_id;
+      if (filename) row.filename = filename;
+      const res = await supabase
+        .from("jobs")
+        .upsert(row, { onConflict: "job_id" })
+        .select()
+        .single();
+      data = res.data as typeof data;
+      error = res.error;
+    } else {
+      // Intermediate event: only update status + status_event (+ proof_url when present)
+      const patch: Record<string, unknown> = {
+        status_event: event,
+      };
+      if (status) patch.status = status;
+      else if (event === "processing_started") patch.status = "processing";
+      else if (event === "checking_artwork") patch.status = "processing";
+      else if (event === "proof_ready") patch.status = "processing";
+      if (proof_url) patch.proof_url = proof_url;
 
-    const { data, error } = await supabase
-      .from("jobs")
-      .upsert(row, { onConflict: "job_id" })
-      .select()
-      .single();
+      const res = await supabase
+        .from("jobs")
+        .update(patch)
+        .eq("job_id", job_id)
+        .select()
+        .single();
+      data = res.data as typeof data;
+      error = res.error;
+    }
 
     if (error) {
       return new Response(
@@ -138,6 +162,7 @@ Deno.serve(async (req) => {
         }
       );
     }
+
 
     // Forward to caller's callback_url if present, and track delivery
     console.log("[preflight-webhook] callback_url on job row:", data?.callback_url ?? "NONE");

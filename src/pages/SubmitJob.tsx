@@ -8,6 +8,7 @@ import { Stepper } from "@/components/submit/Stepper";
 import { StepProduct } from "@/components/submit/StepProduct";
 import { StepFiles, type FilesByRole } from "@/components/submit/StepFiles";
 import { StepConfig } from "@/components/submit/StepConfig";
+import { STANDARD_PRESET, isStandardPreset } from "@/lib/standardPreset";
 import { StepReview } from "@/components/submit/StepReview";
 
 const STEP_TITLES = {
@@ -37,10 +38,9 @@ export default function SubmitJob() {
       job_id: `job-${Date.now()}`,
       artwork,
       proof: { generate: true, thumbnails: { count: 4 } },
-      spec: {
-        preset: presetId,
-        product: { type: product.id },
-      },
+      spec: isStandardPreset(presetId)
+        ? { product: { type: product.id }, ...STANDARD_PRESET.spec }
+        : { preset: presetId, product: { type: product.id } },
     };
     try {
       const result = await submitJob.mutateAsync(payload);

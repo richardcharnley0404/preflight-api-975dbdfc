@@ -38,10 +38,9 @@ export default function SubmitJob() {
       job_id: `job-${Date.now()}`,
       artwork,
       proof: { generate: true, thumbnails: { count: 4 } },
-      spec: {
-        preset: presetId,
-        product: { type: product.id },
-      },
+      spec: isStandardPreset(presetId)
+        ? { product: { type: product.id }, ...STANDARD_PRESET.spec }
+        : { preset: presetId, product: { type: product.id } },
     };
     try {
       const result = await submitJob.mutateAsync(payload);

@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Upload, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useArtworkUpload, readPdfPageCount, validatePageCount } from "@/hooks/useArtworkUpload";
@@ -20,22 +22,39 @@ function humanize(role: string) {
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+export function productNeedsSpine(product: Product): boolean {
+  const id = product.id.toLowerCase();
+  const binding = (product.binding ?? "").toLowerCase();
+  return (
+    id.includes("perfect_bound") ||
+    id.includes("case_bound") ||
+    binding === "perfect_bound" ||
+    binding === "case_bound"
+  );
+}
+
 export function StepFiles({
   product,
   files,
   setFiles,
+  spineMm,
+  setSpineMm,
   onBack,
   onNext,
 }: {
   product: Product;
   files: FilesByRole;
   setFiles: (f: FilesByRole) => void;
+  spineMm: number | undefined;
+  setSpineMm: (v: number | undefined) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
+  const needsSpine = productNeedsSpine(product);
   const allRequiredFilled = product.files
     .filter((s) => s.required !== false)
     .every((s) => files[s.role]);
+  const spineOk = !needsSpine || (typeof spineMm === "number" && spineMm > 0);
 
   return (
     <div className="space-y-4">
@@ -50,12 +69,38 @@ export function StepFiles({
             delete next[slot.role];
             setFiles(next);
           }}
+          extra={
+            needsSpine && slot.role === "cover" ? (
+              <div className="space-y-1.5 pt-2">
+                <Label htmlFor="spine-mm" className="text-sm">
+                  Spine width (mm) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="spine-mm"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step={0.1}
+                  placeholder="e.g. 8.5"
+                  className="max-w-[160px]"
+                  value={spineMm ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setSpineMm(v === "" ? undefined : Number(v));
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Required so the proof positions the spine correctly on the cover spread.
+                </p>
+              </div>
+            ) : null
+          }
         />
       ))}
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>Back</Button>
-        <Button onClick={onNext} disabled={!allRequiredFilled}>Next</Button>
+        <Button onClick={onNext} disabled={!allRequiredFilled || !spineOk}>Next</Button>
       </div>
     </div>
   );
@@ -66,11 +111,13 @@ function FileSlot({
   file,
   onUploaded,
   onClear,
+  extra,
 }: {
   slot: ProductFileSlot;
   file?: UploadedSlotFile;
   onUploaded: (f: UploadedSlotFile) => void;
   onClear: () => void;
+  extra?: ReactNode;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading, progress } = useArtworkUpload();
@@ -159,6 +206,7 @@ function FileSlot({
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {extra}
       </CardContent>
     </Card>
   );

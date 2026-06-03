@@ -206,6 +206,7 @@ function FileSlot({
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
+        {extra}
       </CardContent>
     </Card>
   );

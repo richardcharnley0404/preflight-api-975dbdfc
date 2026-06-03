@@ -52,14 +52,21 @@ export default function SubmitJob() {
         (product.binding ?? "").toLowerCase() === "perfect_bound" ||
         (product.binding ?? "").toLowerCase() === "case_bound";
       const spine_mm = spineMm;
-      const pages = Object.entries(files).map(([role, f]) => ({
-        type: role,
-        range: f.pages > 1 ? `1-${f.pages}` : "1",
-        trim: { width: trim_default.width, height: trim_default.height },
-        bleed,
-        safe_zone,
-        ...(needsSpine && role === "cover" ? { spine_mm } : {}),
-      }));
+      const pages = Object.entries(files).map(([role, f]) => {
+        const isCoverSpread = needsSpine && role === "cover";
+        return {
+          type: role,
+          range: f.pages > 1 ? `1-${f.pages}` : "1",
+          // Omit trim on the cover spread so the backend can auto-derive it
+          // from text.width and spine_mm (width = 2 * text.width + spine_mm).
+          ...(isCoverSpread
+            ? {}
+            : { trim: { width: trim_default.width, height: trim_default.height } }),
+          bleed,
+          safe_zone,
+          ...(isCoverSpread ? { spine_mm } : {}),
+        };
+      });
       spec = {
         product: { type: product.id },
         units,

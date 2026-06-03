@@ -109,7 +109,7 @@ export function useJobDetail(jobId: string | undefined) {
 export interface PageSpec {
   type: string;
   range: string;
-  trim: { width: number; height: number };
+  trim?: { width: number; height: number };
   bleed: { left: number; right: number; top: number; bottom: number };
   safe_zone: { left: number; right: number; top: number; bottom: number };
   spine_mm?: number;

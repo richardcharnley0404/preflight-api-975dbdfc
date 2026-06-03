@@ -111,11 +111,13 @@ function FileSlot({
   file,
   onUploaded,
   onClear,
+  extra,
 }: {
   slot: ProductFileSlot;
   file?: UploadedSlotFile;
   onUploaded: (f: UploadedSlotFile) => void;
   onClear: () => void;
+  extra?: ReactNode;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading, progress } = useArtworkUpload();

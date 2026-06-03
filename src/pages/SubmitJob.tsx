@@ -8,6 +8,7 @@ import { Stepper } from "@/components/submit/Stepper";
 import { StepProduct } from "@/components/submit/StepProduct";
 import { StepFiles, type FilesByRole } from "@/components/submit/StepFiles";
 import { StepConfig } from "@/components/submit/StepConfig";
+import { STANDARD_PRESET, isStandardPreset } from "@/lib/standardPreset";
 import { StepReview } from "@/components/submit/StepReview";
 
 const STEP_TITLES = {

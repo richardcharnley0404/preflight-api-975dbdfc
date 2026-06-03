@@ -5,18 +5,28 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { useCustomPresets, type Product, type CustomPreset } from "@/hooks/useApiData";
+import { STANDARD_PRESET } from "@/lib/standardPreset";
 
 export interface ResolvedPreset {
   id: string;          // preset_id used at submit
   name: string;
   description?: string;
-  source: "custom" | "builtin";
+  source: "system" | "custom" | "builtin";
 }
 
 export function filterPresetsForProduct(
   custom: CustomPreset[],
   product: Product,
-): { custom: ResolvedPreset[]; builtin: ResolvedPreset[] } {
+): { system: ResolvedPreset[]; custom: ResolvedPreset[]; builtin: ResolvedPreset[] } {
+  const system: ResolvedPreset[] = [
+    {
+      id: STANDARD_PRESET.preset_id,
+      name: STANDARD_PRESET.name,
+      description: STANDARD_PRESET.description,
+      source: "system",
+    },
+  ];
+
   const matchedCustom = custom
     .filter((p) => Array.isArray(p.for_product_types) && p.for_product_types.includes(product.id))
     .map<ResolvedPreset>((p) => ({
@@ -33,7 +43,7 @@ export function filterPresetsForProduct(
     source: "builtin",
   }));
 
-  return { custom: matchedCustom, builtin };
+  return { system, custom: matchedCustom, builtin };
 }
 
 export function StepConfig({

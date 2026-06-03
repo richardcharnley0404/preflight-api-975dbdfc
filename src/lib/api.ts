@@ -59,6 +59,17 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return res.json();
 }
 
+export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(proxyUrl(path), {
+    method: "PUT",
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  await throwIfError(res);
+  return res.json();
+}
+
 export async function apiDelete<T>(path: string): Promise<T> {
   const headers = await getAuthHeaders();
   const res = await fetch(proxyUrl(path), {
@@ -68,6 +79,7 @@ export async function apiDelete<T>(path: string): Promise<T> {
   await throwIfError(res);
   return res.json();
 }
+
 
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
